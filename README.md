@@ -1,133 +1,136 @@
-# NEO — Network Exploration Operator
+# 🌌 AURA — Advanced Unified Reconnaissance Agent
 
-Ferramenta em Python desenvolvida para auxiliar em atividades de auditoria interna, permitindo a execução de rotinas de varredura, testes e automações de forma prática e rastreável.
+**Dashboard Avançado em Python + PyQt6 para Operações de Segurança Interna**
 
-Feita para uso em **ambiente Linux**, com **ambiente virtual (venv)** e dependências específicas para cada módulo.  
-Utilize somente em sistemas nos quais você possui autorização.
+O **AURA** é um painel moderno e interativo desenvolvido em **PyQt6**, projetado para reunir e gerenciar todas as ferramentas de segurança utilizadas em ambiente interno. Ele centraliza scanners, ferramentas de automação, scripts de análise, verificações de ambiente, relatórios e módulos de configuração.
 
----
-
-## ✨ Recursos principais
-
-- Execução automatizada de rotinas de segurança  
-- Varredura de múltiplos hosts  
-- Registro detalhado de falhas, sucessos e motivos  
-- Geração de relatórios em **JSON** ou **CSV**  
-- Execução modular: você pode adicionar / remover módulos facilmente  
-- Logs completos com opção `--verbose`  
-- Salvamento automático em casos de interrupção (Ctrl+C)  
-- Estruturado para rodar via **cron**, **systemd** ou manualmente  
+> ⚠️ **Uso exclusivo para testes autorizados**.
+> Não executa atividades maliciosas, não coleta informações sigilosas, não copia dados e não envia nada para fora da rede.
+> Toda lógica é 100% focada em **mapear falhas**, **validar controles** e **auxiliar no reforço da segurança**.
 
 ---
 
-## 📁 Estrutura recomendada do projeto
+## ✨ **Recursos Principais**
 
-\`\`\`
-neo/
-│
-├── neo.py                   # Script principal
-├── modules/                 # Pasta com módulos (scan, ssh, http, etc)
-│   ├── scanner.py
-│   ├── reporter.py
-│   └── ...
-│
-├── config/
-│   └── hosts.txt            # Lista de IPs/hosts
-│
-├── output/
-│   ├── resultados.json
-│   └── resultados.csv
-│
-├── README.md
-└── venv/                    # Ambiente virtual
-\`\`\`
+### 🧭 **Interface Neon Dark Mode (estilo dashboard hacker moderno)**
 
----
+* Estilo escuro com efeitos neon suaves.
+* Cards animados com brilho pulsante (Glow Effect).
+* Layout organizado em sidebar + área dinâmica.
+* Totalmente escalável a qualquer resolução.
 
-## 🔧 Instalação (Linux)
+### 🧩 **Módulos Disponíveis no Painel**
 
-### 1) Criar ambiente virtual
-\`\`\`bash
-python3 -m venv venv
-\`\`\`
+Cada card no painel principal representa um sistema do AURA:
 
-### 2) Ativar o venv
-\`\`\`bash
-source venv/bin/activate
-\`\`\`
-
-### 3) (Opcional) atualizar pip
-\`\`\`bash
-python -m pip install --upgrade pip
-\`\`\`
-
-### 4) Instalar dependências
-Exemplo (ajuste conforme seus módulos):
-\`\`\`bash
-pip install paramiko
-pip install python-nmap
-\`\`\`
+* **🛰️ Scanner de Rede** — Varredura e detecção de hosts
+* **🚪 Analisador de Portas** — Teste de portas e respostas
+* **📊 Relatórios** — Geração de CSV, logs e auditorias
+* **🧪 Scripts Automáticos** — Execução de rotinas Python e .bat
+* **🎯 Alvos** — Gerenciamento rápido de IPs e ranges
+* **📁 Logs do Sistema** — Histórico de execuções
+* **⚙️ Modo Avançado** — Funções extras, debug e devtools
+* **📡 Status** — Verificação do ambiente
+* **🔧 Configurações** — Ajustes gerais
 
 ---
 
-## ▶️ Como executar
+## ⚙️ **Configurações Personalizáveis**
 
-Execução padrão:
-\`\`\`bash
-python neo.py --verbose
-\`\`\`
+### 🎨 **Tema do App**
 
-Usando arquivo customizado de hosts:
-\`\`\`bash
-python neo.py --hosts config/hosts.txt --verbose
-\`\`\`
+* Modo **Claro**
+* Modo **Escuro** (padrão)
 
-Selecionar formato de saída:
-\`\`\`bash
-python neo.py --output output/resultado.json --format json --verbose
-python neo.py --output output/resultado.csv --format csv
-\`\`\`
+### 🌈 **Cores Neon**
 
-Executar como root mantendo o venv:
-\`\`\`bash
-sudo venv/bin/python neo.py --verbose
-\`\`\`
+Escolha entre:
 
----
+* Roxo (padrão)
+* Vermelho
+* Verde
+* Azul
+* Rosa
+* Amarelo
+* Ou totalmente **sem brilho neon**
 
-## 📦 Formato de relatório (JSON)
+### 🏷️ **Temas Especiais**
 
-\`\`\`json
-{
-  "host": "172.16.0.10",
-  "acesso": true,
-  "modulos_executados": ["ssh_test", "port_scan"],
-  "tentativas": [
-    {
-      "modulo": "ssh_test",
-      "usuario": "root",
-      "senha": "root",
-      "acesso": true,
-      "detalhes": "comando remoto executado",
-      "tempo_segundos": 0.52
-    }
-  ]
-}
-\`\`\`
+* 🎄 Natal
+* 🎃 Halloween
+* 🐰 Páscoa
+* 🇧🇷 Tema Brasil
+* Nenhum (padrão)
+
+### 🌐 **Idiomas do Sistema**
+
+* Português
+* Inglês
+* Espanhol
+* Francês
+* Italiano
+* Russo
+* Chinês
+* Coreano
+* Japonês
+* Alemão
+* Árabe
 
 ---
 
-## ⏹ Interromper com segurança
+## 🧠 **Arquitetura do Projeto**
 
-Para parar:
-\`\`\`bash
-Ctrl + C
-\`\`\`
+### Principais classes:
 
-O script salva automaticamente os resultados parciais no arquivo de saída escolhido.
+* **NeonCard** → Cards com glow + hover dinâmico.
+* **ConfigPage** → Página completa de configurações.
+* **MainWindow** → Estrutura principal do dashboard.
+
+### Tecnologias utilizadas:
+
+* **Python 3**
+* **PyQt6**
+* **Efeitos QSS / QGraphicsDropShadowEffect**
+* **QPropertyAnimation** (pulso neon)
 
 ---
 
-## ✔️ Conclusão
+## ▶️ **Como executar**
 
-NEO é uma ferramenta modular, eficiente e organizada para auditoria de sistemas internos.
+```bash
+python3 aura_dashboard.py
+```
+
+Necessário ter:
+
+* Python 3.9+
+* PyQt6 instalado
+
+```bash
+pip install PyQt6
+```
+
+---
+
+## 📘 **Status do Projeto**
+
+✔ UI Finalizada
+
+✔ Cards funcionais
+
+✔ Configurações ativas
+
+◻ Mais ferramentas internas sendo integradas
+
+---
+
+## 🛡️ Aviso Legal
+
+Este software **não possui** nenhuma funcionalidade voltada para roubo de dados, invasão externa, coleta de informações sigilosas ou qualquer ação ilícita.
+É estritamente uma ferramenta de **segurança defensiva**.
+
+---
+
+## 📜 Licença
+
+Uso interno e restrito. Direitos reservados ao autor.
