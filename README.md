@@ -12,7 +12,7 @@ O **AURA** é um painel moderno e interativo desenvolvido em **PyQt6**, projetad
 
 ## ✨ **Recursos Principais**
 
-### 🧭 **Interface Neon Dark Mode (estilo dashboard hacker moderno)**
+### 🧭 **Interface Neon Dark Mode**
 
 * Estilo escuro com efeitos neon suaves.
 * Cards animados com brilho pulsante (Glow Effect).
