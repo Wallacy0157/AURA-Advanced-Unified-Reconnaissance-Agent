@@ -133,4 +133,4 @@ Este software **não possui** nenhuma funcionalidade voltada para roubo de dados
 
 ## 📜 Licença
 
-Uso interno e restrito. Direitos reservados ao autor.
+Uso interno e restrito. Direitos reservados aos autores.
