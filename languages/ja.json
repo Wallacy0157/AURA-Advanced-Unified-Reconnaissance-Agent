@@ -1,0 +1,95 @@
+{
+    "app_title": "セキュリティツールキット — ネオンダッシュボード",
+
+    "sidebar": {
+        "home": "ホーム",
+        "tools": "ツール",
+        "scripts": "スクリプト",
+        "logs": "ログ",
+        "settings": "設定",
+        "exit": "終了"
+    },
+
+    "header": {
+        "operations_panel": "操作パネル",
+        "search_placeholder": "ツールを検索...",
+        "status_ready": "準備完了"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "ネットワークスキャナー",
+            "subtitle": "ホストのスキャンと検出"
+        },
+        "ports": {
+            "title": "ポートアナライザー",
+            "subtitle": "特定のポートをテスト"
+        },
+        "reports": {
+            "title": "レポート",
+            "subtitle": "CSV/LOGの自動生成"
+        },
+        "scripts_auto": {
+            "title": "自動スクリプト",
+            "subtitle": "Python/.bat ルーチンの実行"
+        },
+        "targets": {
+            "title": "ターゲット",
+            "subtitle": "IPと範囲の管理"
+        },
+        "logs": {
+            "title": "システムログ",
+            "subtitle": "実行履歴"
+        },
+        "advanced": {
+            "title": "アドバンスモード",
+            "subtitle": "追加機能 / 開発者ツール"
+        },
+        "status": {
+            "title": "ステータス",
+            "subtitle": "環境チェック"
+        },
+        "settings": {
+            "title": "設定",
+            "subtitle": "システム設定"
+        }
+    },
+
+    "settings_page": {
+        "title": "設定",
+        "themes": "テーマ",
+        "choose_theme": "テーマを選択",
+        "theme_dark": "ダークテーマ",
+        "theme_light": "ライトテーマ",
+
+        "neon_color": "ネオンカラー",
+        "choose_color": "色を選択",
+        "color_purple": "パープル",
+        "color_red": "レッド",
+        "color_green": "グリーン",
+        "color_blue": "ブルー",
+        "color_pink": "ピンク",
+        "color_yellow": "イエロー",
+        "color_none": "光効果なし",
+
+        "special_themes": "特別テーマ",
+        "theme_christmas": "クリスマス",
+        "theme_halloween": "ハロウィン",
+        "theme_easter": "イースター",
+        "theme_brazil": "ブラジル",
+
+        "languages": "言語",
+        "choose_language": "言語を選択",
+        "lang_pt": "ポルトガル語",
+        "lang_en": "英語",
+        "lang_es": "スペイン語",
+        "lang_fr": "フランス語",
+        "lang_it": "イタリア語",
+        "lang_de": "ドイツ語",
+        "lang_ru": "ロシア語",
+        "lang_ja": "日本語",
+        "lang_ko": "韓国語",
+        "lang_zh": "中国語",
+        "lang_ar": "アラビア語"
+    }
+}

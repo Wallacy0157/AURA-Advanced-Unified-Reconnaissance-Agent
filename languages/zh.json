@@ -1,0 +1,95 @@
+{
+    "app_title": "安全工具包 — 霓虹仪表板",
+
+    "sidebar": {
+        "home": "主页",
+        "tools": "工具",
+        "scripts": "脚本",
+        "logs": "日志",
+        "settings": "设置",
+        "exit": "退出"
+    },
+
+    "header": {
+        "operations_panel": "操作面板",
+        "search_placeholder": "搜索工具...",
+        "status_ready": "就绪"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "网络扫描仪",
+            "subtitle": "扫描和检测主机"
+        },
+        "ports": {
+            "title": "端口分析器",
+            "subtitle": "测试特定端口"
+        },
+        "reports": {
+            "title": "报告",
+            "subtitle": "自动生成 CSV/LOG"
+        },
+        "scripts_auto": {
+            "title": "自动脚本",
+            "subtitle": "执行 Python/.bat 例程"
+        },
+        "targets": {
+            "title": "目标",
+            "subtitle": "管理 IP 和范围"
+        },
+        "logs": {
+            "title": "系统日志",
+            "subtitle": "运行历史记录"
+        },
+        "advanced": {
+            "title": "高级模式",
+            "subtitle": "额外功能 / DevTools"
+        },
+        "status": {
+            "title": "状态",
+            "subtitle": "环境检查"
+        },
+        "settings": {
+            "title": "设置",
+            "subtitle": "系统偏好设置"
+        }
+    },
+
+    "settings_page": {
+        "title": "设置",
+        "themes": "主题",
+        "choose_theme": "选择主题",
+        "theme_dark": "深色主题",
+        "theme_light": "浅色主题",
+
+        "neon_color": "霓虹色",
+        "choose_color": "选择颜色",
+        "color_purple": "紫色",
+        "color_red": "红色",
+        "color_green": "绿色",
+        "color_blue": "蓝色",
+        "color_pink": "粉色",
+        "color_yellow": "黄色",
+        "color_none": "无发光效果",
+
+        "special_themes": "特殊主题",
+        "theme_christmas": "圣诞主题",
+        "theme_halloween": "万圣节主题",
+        "theme_easter": "复活节主题",
+        "theme_brazil": "巴西主题",
+
+        "languages": "语言",
+        "choose_language": "选择语言",
+        "lang_pt": "葡萄牙语",
+        "lang_en": "英语",
+        "lang_es": "西班牙语",
+        "lang_fr": "法语",
+        "lang_it": "意大利语",
+        "lang_de": "德语",
+        "lang_ru": "俄语",
+        "lang_ja": "日语",
+        "lang_ko": "韩语",
+        "lang_zh": "中文",
+        "lang_ar": "阿拉伯语"
+    }
+}

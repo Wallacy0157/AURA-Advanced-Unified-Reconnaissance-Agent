@@ -1,0 +1,95 @@
+{
+    "app_title": "مجموعة أدوات الأمان — لوحة تحكم النيون",
+
+    "sidebar": {
+        "home": "الرئيسية",
+        "tools": "الأدوات",
+        "scripts": "السكريبتات",
+        "logs": "السجلات",
+        "settings": "الإعدادات",
+        "exit": "خروج"
+    },
+
+    "header": {
+        "operations_panel": "لوحة العمليات",
+        "search_placeholder": "البحث عن أدوات...",
+        "status_ready": "جاهز"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "ماسح الشبكة",
+            "subtitle": "مسح واكتشاف المضيفين"
+        },
+        "ports": {
+            "title": "محلل المنافذ",
+            "subtitle": "اختبار منافذ محددة"
+        },
+        "reports": {
+            "title": "التقارير",
+            "subtitle": "إنشاء تلقائي لـ CSV/LOG"
+        },
+        "scripts_auto": {
+            "title": "السكريبتات التلقائية",
+            "subtitle": "تنفيذ روتينات Python/.bat"
+        },
+        "targets": {
+            "title": "الأهداف",
+            "subtitle": "إدارة عناوين IP والنطاقات"
+        },
+        "logs": {
+            "title": "سجلات النظام",
+            "subtitle": "سجل التشغيل"
+        },
+        "advanced": {
+            "title": "الوضع المتقدم",
+            "subtitle": "وظائف إضافية / أدوات المطورين"
+        },
+        "status": {
+            "title": "الحالة",
+            "subtitle": "التحقق من البيئة"
+        },
+        "settings": {
+            "title": "الإعدادات",
+            "subtitle": "تفضيلات النظام"
+        }
+    },
+
+    "settings_page": {
+        "title": "الإعدادات",
+        "themes": "السمات",
+        "choose_theme": "اختر سمة",
+        "theme_dark": "السمة الداكنة",
+        "theme_light": "السمة الفاتحة",
+
+        "neon_color": "لون النيون",
+        "choose_color": "اختر لون",
+        "color_purple": "أرجواني",
+        "color_red": "أحمر",
+        "color_green": "أخضر",
+        "color_blue": "أزرق",
+        "color_pink": "وردي",
+        "color_yellow": "أصفر",
+        "color_none": "بدون تأثير ضوئي",
+
+        "special_themes": "سمات خاصة",
+        "theme_christmas": "سمة عيد الميلاد",
+        "theme_halloween": "سمة الهالوين",
+        "theme_easter": "سمة عيد الفصح",
+        "theme_brazil": "سمة البرازيل",
+
+        "languages": "اللغات",
+        "choose_language": "اختر لغة",
+        "lang_pt": "البرتغالية",
+        "lang_en": "الإنجليزية",
+        "lang_es": "الإسبانية",
+        "lang_fr": "الفرنسية",
+        "lang_it": "الإيطالية",
+        "lang_de": "الألمانية",
+        "lang_ru": "الروسية",
+        "lang_ja": "اليابانية",
+        "lang_ko": "الكورية",
+        "lang_zh": "الصينية",
+        "lang_ar": "العربية"
+    }
+}

@@ -1,0 +1,95 @@
+{
+    "app_title": "Набор инструментов безопасности — Панель Neon",
+
+    "sidebar": {
+        "home": "Главная",
+        "tools": "Инструменты",
+        "scripts": "Скрипты",
+        "logs": "Журналы",
+        "settings": "Настройки",
+        "exit": "Выход"
+    },
+
+    "header": {
+        "operations_panel": "Панель операций",
+        "search_placeholder": "Поиск инструментов...",
+        "status_ready": "Готов"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "Сетевой сканер",
+            "subtitle": "Сканирование и обнаружение хостов"
+        },
+        "ports": {
+            "title": "Анализатор портов",
+            "subtitle": "Тестирование определенных портов"
+        },
+        "reports": {
+            "title": "Отчеты",
+            "subtitle": "Автоматическая генерация CSV/LOG"
+        },
+        "scripts_auto": {
+            "title": "Автоматические скрипты",
+            "subtitle": "Выполнение рутин Python/.bat"
+        },
+        "targets": {
+            "title": "Цели",
+            "subtitle": "Управление IP и диапазонами"
+        },
+        "logs": {
+            "title": "Системные журналы",
+            "subtitle": "История запусков"
+        },
+        "advanced": {
+            "title": "Расширенный режим",
+            "subtitle": "Дополнительные функции / DevTools"
+        },
+        "status": {
+            "title": "Статус",
+            "subtitle": "Проверка среды"
+        },
+        "settings": {
+            "title": "Настройки",
+            "subtitle": "Системные предпочтения"
+        }
+    },
+
+    "settings_page": {
+        "title": "Настройки",
+        "themes": "Темы",
+        "choose_theme": "Выбрать тему",
+        "theme_dark": "Темная тема",
+        "theme_light": "Светлая тема",
+
+        "neon_color": "Неоновый цвет",
+        "choose_color": "Выбрать цвет",
+        "color_purple": "Фиолетовый",
+        "color_red": "Красный",
+        "color_green": "Зеленый",
+        "color_blue": "Синий",
+        "color_pink": "Розовый",
+        "color_yellow": "Желтый",
+        "color_none": "Без светового эффекта",
+
+        "special_themes": "Специальные темы",
+        "theme_christmas": "Рождественская тема",
+        "theme_halloween": "Тема Хэллоуина",
+        "theme_easter": "Пасхальная тема",
+        "theme_brazil": "Тема Бразилии",
+
+        "languages": "Языки",
+        "choose_language": "Выбрать язык",
+        "lang_pt": "Португальский",
+        "lang_en": "Английский",
+        "lang_es": "Испанский",
+        "lang_fr": "Французский",
+        "lang_it": "Итальянский",
+        "lang_de": "Немецкий",
+        "lang_ru": "Русский",
+        "lang_ja": "Японский",
+        "lang_ko": "Корейский",
+        "lang_zh": "Китайский",
+        "lang_ar": "Арабский"
+    }
+}

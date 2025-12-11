@@ -1,0 +1,95 @@
+{
+    "app_title": "Security Toolkit — Neon Dashboard",
+
+    "sidebar": {
+        "home": "Startseite",
+        "tools": "Werkzeuge",
+        "scripts": "Skripte",
+        "logs": "Protokolle",
+        "settings": "Einstellungen",
+        "exit": "Beenden"
+    },
+
+    "header": {
+        "operations_panel": "Bedienfeld",
+        "search_placeholder": "Werkzeuge suchen...",
+        "status_ready": "Bereit"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "Netzwerk-Scanner",
+            "subtitle": "Hosts scannen und erkennen"
+        },
+        "ports": {
+            "title": "Port-Analysator",
+            "subtitle": "Spezifische Ports testen"
+        },
+        "reports": {
+            "title": "Berichte",
+            "subtitle": "Automatische CSV/LOG-Generierung"
+        },
+        "scripts_auto": {
+            "title": "Auto-Skripte",
+            "subtitle": "Python/.bat Routinen ausführen"
+        },
+        "targets": {
+            "title": "Ziele",
+            "subtitle": "IPs und Bereiche verwalten"
+        },
+        "logs": {
+            "title": "Systemprotokolle",
+            "subtitle": "Laufverlauf"
+        },
+        "advanced": {
+            "title": "Erweiterter Modus",
+            "subtitle": "Zusatzfunktionen / DevTools"
+        },
+        "status": {
+            "title": "Status",
+            "subtitle": "Umgebungsprüfung"
+        },
+        "settings": {
+            "title": "Einstellungen",
+            "subtitle": "Systemeinstellungen"
+        }
+    },
+
+    "settings_page": {
+        "title": "Einstellungen",
+        "themes": "Themen",
+        "choose_theme": "Thema auswählen",
+        "theme_dark": "Dunkles Thema",
+        "theme_light": "Helles Thema",
+
+        "neon_color": "Neonfarbe",
+        "choose_color": "Farbe auswählen",
+        "color_purple": "Lila",
+        "color_red": "Rot",
+        "color_green": "Grün",
+        "color_blue": "Blau",
+        "color_pink": "Pink",
+        "color_yellow": "Gelb",
+        "color_none": "Kein Lichteffekt",
+
+        "special_themes": "Spezielle Themen",
+        "theme_christmas": "Weihnachtsthema",
+        "theme_halloween": "Halloween-Thema",
+        "theme_easter": "Osterthema",
+        "theme_brazil": "Brasilien-Thema",
+
+        "languages": "Sprachen",
+        "choose_language": "Sprache auswählen",
+        "lang_pt": "Portugiesisch",
+        "lang_en": "Englisch",
+        "lang_es": "Spanisch",
+        "lang_fr": "Französisch",
+        "lang_it": "Italienisch",
+        "lang_de": "Deutsch",
+        "lang_ru": "Russisch",
+        "lang_ja": "Japanisch",
+        "lang_ko": "Koreanisch",
+        "lang_zh": "Chinesisch",
+        "lang_ar": "Arabisch"
+    }
+}

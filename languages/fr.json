@@ -1,0 +1,96 @@
+{
+    "app_title": "Security Toolkit — Tableau de Bord Néon",
+
+    "sidebar": {
+        "home": "Accueil",
+        "tools": "Outils",
+        "scripts": "Scripts",
+        "logs": "Journaux",
+        "settings": "Paramètres",
+        "exit": "Quitter"
+    },
+
+    "header": {
+        "operations_panel": "Panneau d’Opérations",
+        "search_placeholder": "Rechercher des outils...",
+        "status_ready": "Prêt"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "Scanner Réseau",
+            "subtitle": "Analyser et détecter les hôtes"
+        },
+        "ports": {
+            "title": "Analyseur de Ports",
+            "subtitle": "Tester des ports spécifiques"
+        },
+        "reports": {
+            "title": "Rapports",
+            "subtitle": "Génération automatique de CSV/LOG"
+        },
+        "scripts_auto": {
+            "title": "Scripts Automatiques",
+            "subtitle": "Exécuter des routines Python/.bat"
+        },
+        "targets": {
+            "title": "Cibles",
+            "subtitle": "Gérer les IPs et plages"
+        },
+        "logs": {
+            "title": "Journaux Système",
+            "subtitle": "Historique d’exécutions"
+        },
+        "advanced": {
+            "title": "Mode Avancé",
+            "subtitle": "Fonctions supplémentaires / DevTools"
+        },
+        "status": {
+            "title": "Statut",
+            "subtitle": "Vérification de l’environnement"
+        },
+        "settings": {
+            "title": "Paramètres",
+            "subtitle": "Préférences du système"
+        }
+    },
+
+    "settings_page": {
+        "title": "Paramètres",
+        "themes": "Thèmes",
+        "choose_theme": "Choisir un Thème",
+        "theme_dark": "Thème Sombre",
+        "theme_light": "Thème Clair",
+
+        "neon_color": "Couleur Néon",
+        "choose_color": "Choisir une Couleur",
+        "color_purple": "Violet",
+        "color_red": "Rouge",
+        "color_green": "Vert",
+        "color_blue": "Bleu",
+        "color_pink": "Rose",
+        "color_yellow": "Jaune",
+        "color_none": "Sans Effet Lumineux",
+
+        "special_themes": "Thèmes Spéciaux",
+        "theme_christmas": "Thème de Noël",
+        "theme_halloween": "Thème Halloween",
+        "theme_easter": "Thème de Pâques",
+        "theme_brazil": "Thème Brésil",
+
+        "languages": "Langues",
+        "choose_language": "Choisir une Langue",
+        "lang_pt": "Portugais",
+        "lang_en": "Anglais",
+        "lang_es": "Espagnol",
+        "lang_fr": "Français",
+        "lang_it": "Italien",
+        "lang_de": "Allemand",
+        "lang_ru": "Russe",
+        "lang_ja": "Japonais",
+        "lang_ko": "Coréen",
+        "lang_zh": "Chinois",
+        "lang_ar": "Arabe"
+    }
+}
+

@@ -1,0 +1,96 @@
+{
+    "app_title": "Security Toolkit — Neon Dashboard",
+
+    "sidebar": {
+        "home": "Home",
+        "tools": "Tools",
+        "scripts": "Scripts",
+        "logs": "Logs",
+        "settings": "Settings",
+        "exit": "Exit"
+    },
+
+    "header": {
+        "operations_panel": "Operations Panel",
+        "search_placeholder": "Search tools...",
+        "status_ready": "Ready"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "Network Scanner",
+            "subtitle": "Scan and detect hosts"
+        },
+        "ports": {
+            "title": "Port Analyzer",
+            "subtitle": "Test specific ports"
+        },
+        "reports": {
+            "title": "Reports",
+            "subtitle": "Automatic CSV/LOG generation"
+        },
+        "scripts_auto": {
+            "title": "Auto Scripts",
+            "subtitle": "Execute Python/.bat routines"
+        },
+        "targets": {
+            "title": "Targets",
+            "subtitle": "Manage IPs and ranges"
+        },
+        "logs": {
+            "title": "System Logs",
+            "subtitle": "Run history"
+        },
+        "advanced": {
+            "title": "Advanced Mode",
+            "subtitle": "Extra functions / DevTools"
+        },
+        "status": {
+            "title": "Status",
+            "subtitle": "Environment check"
+        },
+        "settings": {
+            "title": "Settings",
+            "subtitle": "System preferences"
+        }
+    },
+
+    "settings_page": {
+        "title": "Settings",
+        "themes": "Themes",
+        "choose_theme": "Choose Theme",
+        "theme_dark": "Dark Theme",
+        "theme_light": "Light Theme",
+
+        "neon_color": "Neon Color",
+        "choose_color": "Choose Color",
+        "color_purple": "Purple",
+        "color_red": "Red",
+        "color_green": "Green",
+        "color_blue": "Blue",
+        "color_pink": "Pink",
+        "color_yellow": "Yellow",
+        "color_none": "No Light Effect",
+
+        "special_themes": "Special Themes",
+        "theme_christmas": "Christmas Theme",
+        "theme_halloween": "Halloween Theme",
+        "theme_easter": "Easter Theme",
+        "theme_brazil": "Brazil Theme",
+
+        "languages": "Languages",
+        "choose_language": "Choose Language",
+        "lang_pt": "Portuguese",
+        "lang_en": "English",
+        "lang_es": "Spanish",
+        "lang_fr": "French",
+        "lang_it": "Italian",
+        "lang_de": "German",
+        "lang_ru": "Russian",
+        "lang_ja": "Japanese",
+        "lang_ko": "Korean",
+        "lang_zh": "Chinese",
+        "lang_ar": "Arabic"
+    }
+}
+

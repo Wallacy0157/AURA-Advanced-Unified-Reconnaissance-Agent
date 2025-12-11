@@ -1,0 +1,95 @@
+{
+    "app_title": "보안 툴킷 — 네온 대시보드",
+
+    "sidebar": {
+        "home": "홈",
+        "tools": "도구",
+        "scripts": "스크립트",
+        "logs": "로그",
+        "settings": "설정",
+        "exit": "종료"
+    },
+
+    "header": {
+        "operations_panel": "작업 패널",
+        "search_placeholder": "도구 검색...",
+        "status_ready": "준비 완료"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "네트워크 스캐너",
+            "subtitle": "호스트 스캔 및 감지"
+        },
+        "ports": {
+            "title": "포트 분석기",
+            "subtitle": "특정 포트 테스트"
+        },
+        "reports": {
+            "title": "보고서",
+            "subtitle": "자동 CSV/LOG 생성"
+        },
+        "scripts_auto": {
+            "title": "자동 스크립트",
+            "subtitle": "Python/.bat 루틴 실행"
+        },
+        "targets": {
+            "title": "대상",
+            "subtitle": "IP 및 범위 관리"
+        },
+        "logs": {
+            "title": "시스템 로그",
+            "subtitle": "실행 기록"
+        },
+        "advanced": {
+            "title": "고급 모드",
+            "subtitle": "추가 기능 / 개발자 도구"
+        },
+        "status": {
+            "title": "상태",
+            "subtitle": "환경 확인"
+        },
+        "settings": {
+            "title": "설정",
+            "subtitle": "시스템 환경 설정"
+        }
+    },
+
+    "settings_page": {
+        "title": "설정",
+        "themes": "테마",
+        "choose_theme": "테마 선택",
+        "theme_dark": "어두운 테마",
+        "theme_light": "밝은 테마",
+
+        "neon_color": "네온 색상",
+        "choose_color": "색상 선택",
+        "color_purple": "보라색",
+        "color_red": "빨간색",
+        "color_green": "녹색",
+        "color_blue": "파란색",
+        "color_pink": "분홍색",
+        "color_yellow": "노란색",
+        "color_none": "빛 효과 없음",
+
+        "special_themes": "특별 테마",
+        "theme_christmas": "크리스마스 테마",
+        "theme_halloween": "할로윈 테마",
+        "theme_easter": "부활절 테마",
+        "theme_brazil": "브라질 테마",
+
+        "languages": "언어",
+        "choose_language": "언어 선택",
+        "lang_pt": "포르투갈어",
+        "lang_en": "영어",
+        "lang_es": "스페인어",
+        "lang_fr": "프랑스어",
+        "lang_it": "이탈리아어",
+        "lang_de": "독일어",
+        "lang_ru": "러시아어",
+        "lang_ja": "일본어",
+        "lang_ko": "한국어",
+        "lang_zh": "중국어",
+        "lang_ar": "아랍어"
+    }
+}
