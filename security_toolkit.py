@@ -568,6 +568,7 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 # --- EXECUÇÃO PRINCIPAL ---
+#test
 
 if __name__ == "__main__":
     
