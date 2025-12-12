@@ -1,0 +1,639 @@
+# AURA/security_toolkit.py
+
+import sys
+import json
+import os
+from PyQt6.QtCore import (
+    Qt, QTimer, QTime, QSize, 
+    QLocale
+)
+from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtWidgets import (
+    QApplication, QMainWindow, QWidget, QLabel, QHBoxLayout, QVBoxLayout,
+    QGridLayout, QToolButton, QPushButton, QStackedWidget, QFrame,
+    QSizePolicy, QLineEdit, QGroupBox, QRadioButton,
+    QComboBox
+)
+
+# --- NOVAS IMPORTAÇÕES ---
+from core.config import NEON_DEFAULT, THEMES, SPECIAL_THEMES 
+from core.components import NeonCard, Snowflake, SnowOverlay
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+LANG_DIR = os.path.join(BASE_DIR, "languages")
+def load_language_json(lang_code):
+    """
+    Tenta carregar LANG_DIR/{lang_code}.json. Retorna dict (pode ser vazio).
+    """
+    if not os.path.isdir(LANG_DIR):
+        return {}
+
+    path = os.path.join(LANG_DIR, f"{lang_code}.json")
+    try:
+        with open(path, "r", encoding="utf-8") as fh:
+            data = json.load(fh)
+            return data if isinstance(data, dict) else {}
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+    return {}
+
+def lang_get(lang_dict, key, fallback=None):
+    """
+    Busca a chave de forma flexível no dicionário de idioma.
+    """
+    if not lang_dict:
+        return fallback
+    
+    if "." in key:
+        parts = key.split(".")
+        cur = lang_dict
+        for p in parts:
+            if isinstance(cur, dict) and p in cur:
+                cur = cur[p]
+            else:
+                return fallback
+        return cur if isinstance(cur, (str, int)) else fallback
+
+    search_paths = ["sidebar", "header", "settings_page", "settings", "cards"]
+    if key in lang_dict:
+        return lang_dict[key]
+    
+    for path in search_paths:
+        if path in lang_dict and isinstance(lang_dict[path], dict) and key in lang_dict[path]:
+            return lang_dict[path][key]
+            
+    return fallback
+
+
+# ---------------- ConfigPage ----------------
+class ConfigPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self._setup_ui()
+    
+    def _setup_ui(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(20)
+
+        self.theme_group = QGroupBox("Temas")
+        theme_layout = QVBoxLayout()
+        
+        theme_radio_layout = QHBoxLayout()
+        self.light_theme_btn = QRadioButton("Claro")
+        self.dark_theme_btn = QRadioButton("Escuro")
+        self.dark_theme_btn.setChecked(True)
+        theme_radio_layout.addWidget(self.light_theme_btn)
+        theme_radio_layout.addWidget(self.dark_theme_btn)
+        
+        theme_layout.addLayout(theme_radio_layout)
+        
+        special_layout = QHBoxLayout()
+        self.special_combo = QComboBox()
+        self.special_combo.setObjectName("SpecialThemeCombo")
+        self.special_combo.addItems(["Nenhum", "Natal", "Halloween", "Páscoa", "Brasil"])
+        special_layout.addWidget(QLabel("Tema Especial:"))
+        special_layout.addWidget(self.special_combo)
+        
+        theme_layout.addLayout(special_layout)
+        self.theme_group.setLayout(theme_layout)
+        layout.addWidget(self.theme_group)
+        
+        self.light_theme_btn.toggled.connect(lambda: self.change_theme("light"))
+        self.dark_theme_btn.toggled.connect(lambda: self.change_theme("dark"))
+        self.special_combo.currentTextChanged.connect(self.change_special_theme)
+
+        self.neon_group = QGroupBox("Cor dos Cards")
+        neon_layout = QHBoxLayout()
+        self.neon_combo = QComboBox()
+        self.neon_combo.setObjectName("NeonColorCombo")
+        self.neon_combo.addItems(["Roxo", "Vermelho", "Verde", "Azul", "Rosa", "Amarelo", "Sem luz"])  
+        neon_layout.addWidget(self.neon_combo)
+        self.neon_group.setLayout(neon_layout)
+        layout.addWidget(self.neon_group)
+        self.neon_combo.currentTextChanged.connect(self.change_neon_color)
+
+        self.lang_group = QGroupBox("Idioma da Interface")
+        lang_layout = QHBoxLayout()
+        self.lang_combo = QComboBox()
+        self.lang_combo.addItems([
+            "Português", "Inglês", "Espanhol", "Francês", "Italiano",
+            "Russo", "Chinês", "Coreano", "Japonês", "Alemão", "Árabe"
+        ])
+        lang_layout.addWidget(self.lang_combo)
+        self.lang_group.setLayout(lang_layout)
+        layout.addWidget(self.lang_group)
+        self.lang_combo.currentTextChanged.connect(self.change_language)
+
+        layout.addStretch()
+        self.setLayout(layout)
+        
+    def update_ui_language(self, L):
+        
+        self.theme_group.setTitle(lang_get(L, "settings_page.themes", "Temas"))
+        self.neon_group.setTitle(lang_get(L, "settings_page.neon_color", "Cor dos Cards"))
+        self.lang_group.setTitle(lang_get(L, "settings_page.languages", "Idioma da Interface"))
+        
+        self.light_theme_btn.setText(lang_get(L, "settings_page.theme_light", "Claro"))
+        self.dark_theme_btn.setText(lang_get(L, "settings_page.theme_dark", "Escuro"))
+
+        special_label = self.theme_group.findChild(QLabel)
+        if special_label:
+            special_label.setText(lang_get(L, "settings_page.special_themes_label", "Tema Especial:"))
+
+        color_items = [
+            lang_get(L, "settings_page.color_purple", "Roxo"),
+            lang_get(L, "settings_page.color_red", "Vermelho"),
+            lang_get(L, "settings_page.color_green", "Verde"),
+            lang_get(L, "settings_page.color_blue", "Azul"),
+            lang_get(L, "settings_page.color_pink", "Rosa"),
+            lang_get(L, "settings_page.color_yellow", "Amarelo"),
+            lang_get(L, "settings_page.color_none", "Sem luz")
+        ]
+        current_text = self.neon_combo.currentText()
+        self.neon_combo.blockSignals(True)
+        self.neon_combo.clear()
+        self.neon_combo.addItems(color_items)
+        if current_text in color_items:
+            self.neon_combo.setCurrentText(current_text)
+        elif self.parent_window.current_neon_color == NEON_DEFAULT: 
+             self.neon_combo.setCurrentText(color_items[0])
+        self.neon_combo.blockSignals(False)
+
+        special_items = [
+            lang_get(L, "settings_page.choose_theme", "Nenhum"),
+            lang_get(L, "settings_page.theme_christmas", "Natal"),
+            lang_get(L, "settings_page.theme_halloween", "Halloween"),
+            lang_get(L, "settings_page.theme_easter", "Páscoa"),
+            lang_get(L, "settings_page.theme_brazil", "Brasil")
+        ]
+        current_text = self.special_combo.currentText()
+        self.special_combo.blockSignals(True)
+        self.special_combo.clear()
+        self.special_combo.addItems(special_items)
+        if current_text in special_items:
+            self.special_combo.setCurrentText(current_text)
+        self.special_combo.blockSignals(False)
+
+    def change_theme(self, theme):
+        if self.parent_window.special_theme_active:
+            self.parent_window.apply_special_theme(lang_get(self.parent_window.current_lang, "settings_page.choose_theme", "Nenhum"))
+            self.special_combo.blockSignals(True)
+            self.special_combo.setCurrentText(lang_get(self.parent_window.current_lang, "settings_page.choose_theme", "Nenhum"))
+            self.special_combo.blockSignals(False)
+
+        self.parent_window.apply_styles(theme)
+        self.parent_window.set_neon_color(self.parent_window.current_neon_color)
+
+
+    def change_neon_color(self, color_name):
+        color_map = {
+            "Roxo": "#7b4dff", "Viola": "#7b4dff", "Фиолетовый": "#7b4dff", "紫色": "#7b4dff", "보라색": "#7b4dff", "パープル": "#7b4dff", "أرجواني": "#7b4dff", "Lila": "#7b4dff", "Purple": "#7b4dff",
+            "Vermelho": "#ff4d4d", "Rosso": "#ff4d4d", "Красный": "#ff4d4d", "红色": "#ff4d4d", "빨간색": "#ff4d4d", "レッド": "#ff4d4d", "أحمر": "#ff4d4d", "Rot": "#ff4d4d", "Red": "#ff4d4d",
+            "Verde": "#00ff90", "Verde": "#00ff90", "Зеленый": "#00ff90", "绿色": "#00ff90", "녹색": "#00ff90", "グリーン": "#00ff90", "أخضر": "#00ff90", "Grün": "#00ff90", "Green": "#00ff90",
+            "Azul": "#4d90ff", "Blu": "#4d90ff", "Синий": "#4d90ff", "蓝色": "#4d90ff", "파란색": "#4d90ff", "ブルー": "#4d90ff", "أزرق": "#4d90ff", "Blau": "#4d90ff", "Blue": "#4d90ff",
+            "Rosa": "#ff4da6", "Rosa": "#ff4da6", "Розовый": "#ff4da6", "粉色": "#ff4da6", "분홍색": "#ff4da6", "ピンク": "#ff4da6", "وردي": "#ff4da6", "Pink": "#ff4da6",
+            "Amarelo": "#ffe44d", "Giallo": "#ffe44d", "Желтый": "#ffe44d", "黄色": "#ffe44d", "노란색": "#ffe44d", "イエロー": "#ffe44d", "أصفر": "#ffe44d", "Gelb": "#ffe44d", "Yellow": "#ffe44d",
+            "Sem luz": None, "Nessun Effetto Luminoso": None, "Без светового эффекта": None, "无发光效果": None, "빛 효과 없음": None, "光効果なし": None, "بدون تأثير ضوئي": None, "Kein Lichteffekt": None, "No light": None
+        }
+        color = color_map.get(color_name, NEON_DEFAULT)
+        self.parent_window.set_neon_color(color)
+
+    def change_special_theme(self, theme_name):
+        self.light_theme_btn.blockSignals(True)
+        self.dark_theme_btn.blockSignals(True)
+        self.light_theme_btn.setChecked(False)
+        self.dark_theme_btn.setChecked(False)
+        self.dark_theme_btn.blockSignals(False)
+        self.light_theme_btn.blockSignals(False)
+        
+        self.parent_window.apply_special_theme(theme_name)
+
+    def change_language(self, lang_name):
+        self.parent_window.apply_language(lang_name)
+
+# ---------------- MainWindow ----------------
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+
+        self.supported_languages = {
+            "Português": "pt", "Inglês": "en", "Espanhol": "es", "Francês": "fr", 
+            "Italiano": "it", "Alemão": "de", "Russo": "ru", "Chinês": "zh", 
+            "Coreano": "ko", "Japonês": "ja", "Árabe": "ar"
+        }
+
+        self.current_lang = load_language_json("pt") or {}
+        self.current_neon_color = NEON_DEFAULT 
+        self.current_theme = "dark" 
+        self.special_theme_active = False
+        self.special_theme_key = None 
+        self.custom_theme_colors = None 
+        self.snow_overlay = None
+
+        self.setWindowTitle("Security Toolkit — Neon Dashboard")
+        self.resize(1200, 760)
+        self._central = QWidget()
+        self.setCentralWidget(self._central)
+
+        self.card_widgets = []
+        self._build_ui()
+        if self.btn_home:
+            self.btn_home.setChecked(True) 
+            
+        self.apply_styles(self.current_theme)
+        self._start_clock()
+
+        self.update_ui_language()
+
+    def load_language_file(self, lang_code):
+        data = load_language_json(lang_code)
+        if not data:
+            if lang_code != "pt":
+                fallback = load_language_json("pt")
+                if fallback:
+                    return fallback
+        return data
+
+    def apply_language(self, lang_name):
+        if lang_name not in self.supported_languages:
+            return
+
+        lang_code = self.supported_languages[lang_name]
+        self.current_lang = self.load_language_file(lang_code) or {}
+        self.update_ui_language()
+        
+    def update_ui_language(self):
+        L = self.current_lang
+        
+        self.btn_home.setText("  " + (lang_get(L, "home", "Home")))
+        self.btn_tools.setText("  " + (lang_get(L, "tools", "Ferramentas")))
+        self.btn_scripts.setText("  " + (lang_get(L, "scripts", "Scripts")))
+        self.btn_logs.setText("  " + (lang_get(L, "logs", "Logs")))
+        self.btn_config.setText("  " + (lang_get(L, "settings", "Configurações")))
+        self.btn_exit.setText(lang_get(L, "sidebar.exit", "Sair"))
+        self.title_label.setText(lang_get(L, "header.operations_panel", "Painel de Operações"))
+        self.search.setPlaceholderText(lang_get(L, "header.search_placeholder", "Pesquisar ferramentas..."))
+        self.status_label.setText(lang_get(L, "header.status_ready", "Pronto"))
+        self.config_page.update_ui_language(L)
+        card_keys = [
+            ("cards.scanner.title", "cards.scanner.subtitle"), ("cards.ports.title", "cards.ports.subtitle"),
+            ("cards.reports.title", "cards.reports.subtitle"), ("cards.scripts_auto.title", "cards.scripts_auto.subtitle"),
+            ("cards.targets.title", "cards.targets.subtitle"), ("cards.logs.title", "cards.logs.subtitle"),
+            ("cards.advanced.title", "cards.advanced.subtitle"), ("cards.status.title", "cards.status.subtitle"),
+            ("cards.settings.title", "cards.settings.subtitle"),
+        ]
+        fallbacks = [
+            ("Scanner de Rede", "Varredura e detecção de hosts"), ("Analisador de Portas", "Teste de portas específicas"),
+            ("Relatórios", "Geração de CSV/LOG automático"), ("Scripts Automáticos", "Execução de rotinas Python/.bat"),
+            ("Alvos", "Gerenciar IPs e ranges"), ("Logs do Sistema", "Histórico de execuções"),
+            ("Modo Avançado", "Funções extras / DevTools"), ("Status", "Verificação do ambiente"),
+            ("Configurações", "Ajustes do sistema"),
+        ]
+        for i, (tkey, skey) in enumerate(card_keys):
+            title = lang_get(L, tkey, fallbacks[i][0])
+            subtitle = lang_get(L, skey, fallbacks[i][1])
+            if i < len(self.card_widgets):
+                self.card_widgets[i].set_texts(title, subtitle)
+        self.setWindowTitle(lang_get(L, "app_title", "Security Toolkit — Neon Dashboard"))
+
+
+    def _build_ui(self):
+        root = QHBoxLayout()
+        root.setContentsMargins(12, 12, 12, 12)
+        root.setSpacing(12)
+        self._central.setLayout(root)
+
+        sidebar = QWidget()
+        sidebar.setObjectName("LeftSidebar")
+        sidebar.setFixedWidth(220)
+        sb_layout = QVBoxLayout()
+        sb_layout.setContentsMargins(12, 12, 12, 12)
+        sb_layout.setSpacing(8)
+        sidebar.setLayout(sb_layout)
+
+        self.logo = QLabel("Security Toolkit")
+        self.logo.setObjectName("logoLabel")
+        self.logo.setFixedHeight(40)
+        logo_font = QFont()
+        logo_font.setPointSize(13)
+        logo_font.setBold(True)
+        self.logo.setFont(logo_font)
+        sb_layout.addWidget(self.logo)
+
+        self.btn_home = self._make_sidebar_button("Home", "🏠")
+        self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️")
+        self.btn_scripts = self._make_sidebar_button("Scripts", "📜")
+        self.btn_logs = self._make_sidebar_button("Logs", "📁")
+        self.btn_config = self._make_sidebar_button("Configurações", "⚙️")
+        
+        self.sidebar_buttons = [self.btn_home, self.btn_tools, self.btn_scripts, self.btn_logs, self.btn_config]
+
+        for btn in self.sidebar_buttons:
+            sb_layout.addWidget(btn)
+
+        sb_layout.addStretch()
+
+        self.btn_exit = QPushButton("Sair")
+        self.btn_exit.clicked.connect(QApplication.instance().quit)
+        self.btn_exit.setFixedHeight(36)
+        sb_layout.addWidget(self.btn_exit)
+        
+        self._update_sidebar_button_style(self.current_neon_color, self.current_theme) 
+
+        main_area = QWidget()
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(6, 6, 6, 6)
+        main_layout.setSpacing(12)
+        main_area.setLayout(main_layout)
+
+        header = QWidget()
+        header_layout = QHBoxLayout()
+        header_layout.setContentsMargins(8, 8, 8, 8)
+        header.setLayout(header_layout)
+
+        self.title_label = QLabel("Painel de Operações")
+        title_font = QFont()
+        title_font.setPointSize(16)
+        title_font.setBold(True)
+        self.title_label.setFont(title_font)
+        header_layout.addWidget(self.title_label)
+        header_layout.addStretch()
+
+        self.search = QLineEdit()
+        self.search.setPlaceholderText("Pesquisar ferramentas...")
+        self.search.setFixedWidth(320)
+        header_layout.addWidget(self.search)
+
+        self.status_label = QLabel("Pronto")
+        header_layout.addWidget(self.status_label)
+
+        self.clock = QLabel("")
+        header_layout.addWidget(self.clock)
+
+        main_layout.addWidget(header)
+
+        self.pages = QStackedWidget()
+        main_layout.addWidget(self.pages)
+
+        home = QWidget()
+        grid = QGridLayout()
+        grid.setSpacing(14)
+        grid.setContentsMargins(6, 6, 6, 6)
+        home.setLayout(grid)
+
+        cards = [
+            ("🛰️", "Scanner de Rede", "Varredura e detecção de hosts"), ("🚪", "Analisador de Portas", "Teste de portas específicas"),
+            ("📊", "Relatórios", "Geração de CSV/LOG automático"), ("🧪", "Scripts Automáticos", "Execução de rotinas Python/.bat"),
+            ("🎯", "Alvos", "Gerenciar IPs e ranges"), ("📁", "Logs do Sistema", "Histórico de execuções"),
+            ("⚙️", "Modo Avançado", "Funções extras / DevTools"), ("📡", "Status", "Verificação do ambiente"),
+            ("🔧", "Configurações", "Ajustes do sistema"),
+        ]
+
+        pos = [(r, c) for r in range(3) for c in range(3)]
+        for i, data in enumerate(cards):
+            icon, title, subtitle = data
+            card = NeonCard(icon, title, subtitle, theme=self.current_theme, theme_manager=self) 
+            card.on_card_activated = lambda t=title: self.on_card_activated(t)
+            self.card_widgets.append(card)
+            r, c = pos[i]
+            grid.addWidget(card, r, c)
+
+        self.pages.addWidget(home)
+
+        tools_page = QLabel("Página Ferramentas - em desenvolvimento")
+        tools_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scripts_page = QLabel("Página Scripts - em desenvolvimento")
+        scripts_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logs_page = QLabel("Página Logs - em desenvolvimento")
+        logs_page.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.config_page = ConfigPage(self)
+
+        self.pages.addWidget(tools_page)
+        self.pages.addWidget(scripts_page)
+        self.pages.addWidget(logs_page)
+        self.pages.addWidget(self.config_page)
+
+        self.btn_home.clicked.connect(lambda: self.pages.setCurrentIndex(0))
+        self.btn_tools.clicked.connect(lambda: self.pages.setCurrentIndex(1))
+        self.btn_scripts.clicked.connect(lambda: self.pages.setCurrentIndex(2))
+        self.btn_logs.clicked.connect(lambda: self.pages.setCurrentIndex(3))
+        self.btn_config.clicked.connect(lambda: self.pages.setCurrentIndex(4))
+
+        root.addWidget(sidebar)
+        root.addWidget(main_area)
+
+
+    def _update_sidebar_button_style(self, neon_color, theme):
+        if self.special_theme_active and self.custom_theme_colors:
+            T = self.custom_theme_colors
+            active_neon = SPECIAL_THEMES.get(self.special_theme_key, {}).get("neon", neon_color)
+        else:
+            T = THEMES.get(theme, THEMES['dark']) 
+            active_neon = neon_color
+
+        border_color = active_neon if active_neon and active_neon != "#00000000" and theme == "dark" else T['border_search']
+        hover_color = active_neon if active_neon and active_neon != "#00000000" else T['border_card']
+        text_hover_color = active_neon if active_neon and active_neon != "#00000000" else T['text_main']
+        
+        qtoolbutton_style = f"""
+            QToolButton {{
+                text-align: left; padding-left: 8px; font-size: 13px;
+                border: 1px solid {border_color}; border-radius: 6px; background: {T['bg_button']};
+                color: {T['text_main']};
+            }}
+            QToolButton:hover, QToolButton:checked {{
+                border: 1px solid {hover_color}; 
+                background: {T['bg_button_hover']};
+                color: {text_hover_color};
+            }}
+            QToolButton:checked {{
+                border: 2px solid {hover_color}; 
+            }}
+        """
+        for btn in self.sidebar_buttons:
+            btn.setStyleSheet(qtoolbutton_style)
+
+        qpushbutton_style = f"""
+            QPushButton {{
+                background: {T['bg_button']};
+                border: 2px solid {T['border_search']};
+                color: {T['text_main']};
+                border-radius: 8px;
+            }}
+            QPushButton:hover {{
+                background: {T['bg_button_hover']};
+                border: 2px solid {hover_color};
+                color: {text_hover_color};
+            }}
+        """
+        self.btn_exit.setStyleSheet(qpushbutton_style)
+
+    def _make_sidebar_button(self, text: str, icon_text: str) -> QToolButton:
+        btn = QToolButton()
+        btn.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
+        btn.setText(f"  {text}")
+        btn.setCheckable(True)
+        btn.setFixedHeight(44)
+        btn.setIconSize(QSize(20, 20))
+        btn.setAutoExclusive(False) 
+        btn.clicked.connect(lambda checked, b=btn: self._handle_sidebar_click(b, checked))
+        return btn
+    
+    def _handle_sidebar_click(self, clicked_btn, is_checked):
+        if is_checked:
+            for btn in self.sidebar_buttons:
+                if btn is not clicked_btn:
+                    btn.setChecked(False)
+        else:
+            if clicked_btn == self.btn_home:
+                 clicked_btn.setChecked(True)
+            elif not any(b.isChecked() for b in self.sidebar_buttons):
+                self.btn_home.setChecked(True)
+                self.pages.setCurrentIndex(0) 
+
+    def on_card_activated(self, title: str):
+        self.status_label.setText(f"Executando: {title}")
+        print(f"[ACTION] Activated: {title}")
+
+    def apply_styles(self, theme="dark"):
+        self.current_theme = theme
+        self.special_theme_active = False
+        self.special_theme_key = None
+        self.custom_theme_colors = None
+        T = THEMES[theme] 
+
+        qss = f"""
+        QWidget {{ background: {T['bg_main']}; color: {T['text_main']}; font-family: 'Segoe UI', Roboto, Arial; font-size: 13px; }}
+        #LeftSidebar {{ background: {T['bg_sidebar']}; border-radius: 8px; }}
+        QLabel {{ color: {T['text_main']}; }}
+        QLabel#logoLabel {{ color: {T['text_main']}; font-weight: 700; font-size: 14px; }}
+        QLineEdit, QComboBox {{ background: {T['bg_search']}; border: 1px solid {T['border_search']}; padding: 6px; border-radius: 6px; color: {T['text_main']}; }}
+        QComboBox::drop-down {{ border: none; }}
+        QComboBox QAbstractItemView {{ border: 1px solid {T['border_search']}; background: {T['bg_search']}; selection-background-color: #4d90ff; color: {T['text_main']}; }}
+        QGroupBox {{ color: {T['text_main']}; font-weight: 600; margin-top: 10px; border: 1px solid {T['border_search']}; border-radius: 6px; padding-top: 20px; }}
+        QGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; padding: 0 4px; left: 10px; }}
+        QRadioButton {{ color: {T['text_main']}; }}
+        QPushButton {{ background: {T['bg_button']}; color: {T['text_main']}; border-radius: 8px; padding: 6px 10px; border: 1px solid {T['border_search']}; }}
+        QPushButton:hover {{ background: {T['bg_button_hover']}; border: 1px solid {T['border_search']}; }}
+        """
+        self.setStyleSheet(qss)
+        
+        self._update_sidebar_button_style(self.current_neon_color, theme)
+
+        for card in self.card_widgets:
+            card.current_theme = theme
+            card.setStyleSheet(card.base_stylesheet(theme))
+        
+        if self.snow_overlay:
+            self.snow_overlay.stop()
+            self.snow_overlay = None
+
+    def set_neon_color(self, color):
+        self.current_neon_color = color if color is not None else "#00000000"
+        
+        if not self.special_theme_active:
+            for card in self.card_widgets:
+                card.set_neon_color(color, self.current_theme)
+            
+        self._update_sidebar_button_style(self.current_neon_color, self.current_theme)
+
+    def apply_special_theme(self, theme_name):
+        theme_key = theme_name
+        for k, v in SPECIAL_THEMES.items():
+            if v == theme_name and k != "Nenhum": 
+                theme_key = v 
+                break
+            elif theme_name in SPECIAL_THEMES and isinstance(SPECIAL_THEMES[theme_name], str):
+                theme_key = SPECIAL_THEMES[theme_name]
+                break
+
+        theme_data = SPECIAL_THEMES.get(theme_key)
+        
+        if self.snow_overlay:
+            self.snow_overlay.stop()
+            self.snow_overlay = None
+            
+        if not theme_data or theme_key == "Nenhum":
+            self.special_theme_active = False
+            self.special_theme_key = None
+            self.custom_theme_colors = None
+            if self.config_page.dark_theme_btn.isChecked():
+                self.apply_styles("dark")
+            else:
+                self.apply_styles("light")
+            self.set_neon_color(self.current_neon_color) 
+            return
+
+        self.special_theme_active = True
+        self.special_theme_key = theme_key
+        
+        neon_color = theme_data["neon"]
+        T = {
+            "bg_main": theme_data["bg_main"],
+            "bg_sidebar": theme_data.get("bg_sidebar", theme_data["bg_main"]),
+            "bg_card": theme_data.get("bg_card", theme_data["bg_main"]),
+            "text_main": theme_data["text"], 
+            "text_secondary": QColor(theme_data["text"]).darker(150).name(),
+            "border_card": QColor(theme_data["bg_card"]).lighter(150).name(),
+            "bg_search": QColor(theme_data["bg_card"]).lighter(120).name(),
+            "border_search": QColor(theme_data["bg_sidebar"]).lighter(130).name(),
+            "bg_button": QColor(theme_data["bg_sidebar"]).lighter(120).name(),
+            "bg_button_hover": QColor(theme_data["bg_sidebar"]).lighter(150).name(),
+        }
+        self.custom_theme_colors = T 
+
+        self._apply_special_styles_qss(T)
+        
+        self._update_sidebar_button_style(neon_color, "custom") 
+        for card in self.card_widgets:
+            card.current_theme = "custom" 
+            card.set_neon_color(neon_color, "custom")
+            card.setStyleSheet(card.base_stylesheet("custom"))
+
+        if theme_data.get("effect") == "snow":
+            if self._central:
+                self.snow_overlay = SnowOverlay(self._central, theme_colors=T)
+                self.snow_overlay.setGeometry(self._central.geometry())
+                self.snow_overlay.show()
+                self.snow_overlay.raise_() 
+
+    def _apply_special_styles_qss(self, T):
+        qss = f"""
+        QWidget {{ background: {T['bg_main']}; color: {T['text_main']}; font-family: 'Segoe UI', Roboto, Arial; font-size: 13px; }}
+        #LeftSidebar {{ background: {T['bg_sidebar']}; border-radius: 8px; }}
+        QLabel {{ color: {T['text_main']}; }}
+        QLabel#logoLabel {{ color: {T['text_main']}; font-weight: 700; font-size: 14px; }}
+        QLineEdit, QComboBox {{ background: {T['bg_search']}; border: 1px solid {T['border_search']}; padding: 6px; border-radius: 6px; color: {T['text_main']}; }}
+        QGroupBox {{ color: {T['text_main']}; font-weight: 600; margin-top: 10px; border: 1px solid {T['border_search']}; border-radius: 6px; padding-top: 20px; }}
+        QGroupBox::title {{ subcontrol-origin: margin; subcontrol-position: top left; padding: 0 4px; left: 10px; }}
+        QRadioButton {{ color: {T['text_main']}; }}
+        QPushButton {{ background: {T['bg_button']}; color: {T['text_main']}; border-radius: 8px; padding: 6px 10px; border: 1px solid {T['border_search']}; }}
+        QPushButton:hover {{ background: {T['bg_button_hover']}; border: 1px solid {T['border_search']}; }}
+        """
+        self.setStyleSheet(qss)
+
+    def _start_clock(self):
+        timer = QTimer(self)
+        timer.timeout.connect(self._update_time)
+        timer.start(1000)
+        self._update_time()
+
+    def _update_time(self):
+        now = QTime.currentTime().toString("HH:mm:ss")
+        self.clock.setText(now)
+
+
+# ------------------ run ------------------
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    if os.path.basename(os.getcwd()) == 'AURA':
+        sys.path.append('.')
+        
+    window = MainWindow()
+    window.show()
+    sys.exit(app.exec())

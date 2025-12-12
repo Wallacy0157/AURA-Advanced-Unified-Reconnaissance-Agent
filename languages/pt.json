@@ -1,0 +1,105 @@
+{
+    "app_title": "Security Toolkit — Dashboard Neon",
+
+    "sidebar": {
+        "home": "Início",
+        "tools": "Ferramentas",
+        "scanner": "Scanner",
+        "scripts": "Scripts",
+        "logs": "Logs",
+        "settings": "Configurações",
+        "exit": "Sair"
+    },
+
+    "header": {
+        "operations_panel": "Painel de Operações",
+        "search_placeholder": "Buscar ferramentas...",
+        "status_ready": "Pronto"
+    },
+
+    "cards": {
+        "scanner": {
+            "title": "Varredura de Rede",
+            "subtitle": "Varre e detecta hosts"
+        },
+        "ports": {
+            "title": "Analisador de Portas",
+            "subtitle": "Testa portas específicas"
+        },
+        "reports": {
+            "title": "Relatórios",
+            "subtitle": "Geração automática de CSV/LOG"
+        },
+        "scripts_auto": {
+            "title": "Scripts Automáticos",
+            "subtitle": "Executa rotinas Python/.bat"
+        },
+        "targets": {
+            "title": "Alvos",
+            "subtitle": "Gerenciar IPs e ranges"
+        },
+        "logs": {
+            "title": "Logs do Sistema",
+            "subtitle": "Histórico de execuções"
+        },
+        "advanced": {
+            "title": "Modo Avançado",
+            "subtitle": "Funções extras / DevTools"
+        },
+        "status": {
+            "title": "Status",
+            "subtitle": "Verificação do ambiente"
+        },
+        "settings": {
+            "title": "Configurações",
+            "subtitle": "Preferências do sistema"
+        }
+    },
+
+    "scanner_page": {
+        "targets_group": "Alvos de Varredura (IPs/Ranges)",
+        "ip_placeholder": "Ex: 192.168.1.1, 10.0.0.0/24, etc.",
+        "start_scan": "Iniciar Varredura Nmap",
+        "results_group": "Resultados",
+        "awaiting_scan": "Aguardando varredura...",
+        "save_results": "Salvar Resultados no Logs/Relatórios"
+    },
+
+    "settings_page": {
+        "title": "Configurações",
+        "themes": "Temas",
+        "choose_theme": "Escolher Tema",
+        "theme_dark": "Tema Escuro",
+        "theme_light": "Tema Claro",
+
+        "neon_color": "Cor Neon",
+        "choose_color": "Escolher Cor",
+        "color_purple": "Roxo",
+        "color_red": "Vermelho",
+        "color_green": "Verde",
+        "color_blue": "Azul",
+        "color_pink": "Rosa",
+        "color_yellow": "Amarelo",
+        "color_none": "Sem Efeito de Luz",
+
+        "special_themes": "Temas Especiais",
+        "theme_christmas": "Tema Natal",
+        "theme_halloween": "Tema Halloween",
+        "theme_easter": "Tema Páscoa",
+        "theme_brazil": "Tema Brasil",
+
+        "languages": "Idiomas",
+        "choose_language": "Escolher Idioma",
+        "lang_pt": "Português",
+        "lang_en": "Inglês",
+        "lang_es": "Espanhol",
+        "lang_fr": "Francês",
+        "lang_it": "Italiano",
+        "lang_de": "Alemão",
+        "lang_ru": "Russo",
+        "lang_ja": "Japonês",
+        "lang_ko": "Coreano",
+        "lang_zh": "Chinês",
+        "lang_ar": "Árabe"
+    }
+}
