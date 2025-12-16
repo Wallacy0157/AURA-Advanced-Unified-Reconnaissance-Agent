@@ -54,7 +54,7 @@ Escolha entre:
 * Amarelo
 * Ou totalmente **sem brilho neon**
 
-### 🏷️ **Temas Especiais**
+### 🏷️ **Temas Especiais**  (Ainda em Desenvolvimento)
 
 * 🎄 Natal
 * 🎃 Halloween
