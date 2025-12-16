@@ -405,21 +405,23 @@ class PayloadPage(QWidget):
                 with open(temp_py, "w", encoding="utf-8") as f:
                     f.write(content)
                 
-                self.status_log.setText("<b>[INFO]</b> Compilando EXE... Olhe o terminal!")
+                self.status_log.setText("<b>[INFO]</b> Compilando EXE... Aguarde.")
                 QApplication.processEvents()
 
-                # Adicionei o caminhos absolutos para o PyInstaller não se perder
-                cmd = f'pyinstaller --onefile --noconsole --noconfirm --distpath "{payload_dir}" --workpath "{os.path.join(payload_dir, "build")}" "{temp_py}"'
+                # USANDO O PYTHON ATUAL PARA CHAMAR O PYINSTALLER (Mais seguro em VENV)
+                # sys.executable garante que ele use o Python do seu ambiente virtual
+                import sys
+                cmd = f'"{sys.executable}" -m PyInstaller --onefile --noconsole --noconfirm --distpath "{payload_dir}" "{temp_py}"'
                 
-                # Executa e espera
                 processo = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                stdout, stderr = processo.communicate() # Pega o erro se houver
-
-                if processo.returncode != 0:
-                    print(f"ERRO PYINSTALLER: {stderr.decode()}")
-                    self.status_log.setText("<b>[ERRO]</b> Falha na compilação. Verifique se o PyInstaller está instalado.")
+                stdout, stderr = processo.communicate()
+                
+                if processo.returncode == 0:
+                    self.status_log.setText(f"<b>[SUCESSO]</b> Agente gerado!<br>Arquivo: <b>temp_win_agent.exe</b>")
                 else:
-                    self.status_log.setText(f"<b>[SUCESSO]</b> Agente Windows gerado em:<br>{payload_dir}")
+                    # Se falhar, vamos imprimir o erro exato no terminal do seu VS Code/PyCharm
+                    print(f"ERRO DE COMPILAÇÃO:\n{stderr.decode()}")
+                    self.status_log.setText("<b>[ERRO]</b> Falha ao compilar. Verifique o terminal.")
 
         except Exception as e:
             self.status_log.setText(f"<b>[ERRO]</b>: {str(e)}")
@@ -869,7 +871,6 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
 # --- EXECUÇÃO PRINCIPAL ---
-#test
 
 if __name__ == "__main__":
     
