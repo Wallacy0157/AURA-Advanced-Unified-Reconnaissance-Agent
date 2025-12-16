@@ -18,4 +18,3 @@ env/
 logs/
 reports/
 *.log
-*.txt
