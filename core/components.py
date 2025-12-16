@@ -94,10 +94,20 @@ class NeonCard(QFrame):
         
         self.layout.addStretch()
         
-        self.setStyleSheet(self._get_style_sheet(self.current_theme_key))
+        self.on_card_activated = lambda: None
         
-        self.mousePressEvent = lambda event: self.on_card_activated()
         self.on_card_activated = lambda: None 
+
+    def mousePressEvent(self, event):
+        """Trata o clique de forma segura para o PyQt6."""
+        # Verifica se foi o botão esquerdo
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Só executa se houver algo conectado
+            if self.on_card_activated:
+                self.on_card_activated()
+        
+        # Aceita o evento para que ele não cause instabilidade no SIP
+        event.accept()
 
     def _get_style_sheet(self, theme_key):
     # (Código mantido)
