@@ -500,6 +500,58 @@ class ListenerPage(QWidget):
                 self.status_conn.setText("Status: Conexão Perdida.")
                 self.cmd_input.setEnabled(False)
 
+# --- DDOS ---
+
+from core.stress_test import DDoSExecutor
+
+class StressTestPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.executor = None
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+        
+        title = QLabel("🔥 Módulo de Stress Test")
+        title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Campos de entrada
+        self.target_input = QLineEdit()
+        self.target_input.setPlaceholderText("IP do Alvo (Ex: 192.168.1.10)")
+        layout.addWidget(QLabel("Alvo:"))
+        layout.addWidget(self.target_input)
+
+        self.threads_input = QLineEdit("100")
+        layout.addWidget(QLabel("Threads (Intensidade):"))
+        layout.addWidget(self.threads_input)
+
+        self.status_label = QLabel("Status: Pronto")
+        layout.addWidget(self.status_label)
+
+        self.btn_action = QPushButton("INICIAR ATAQUE")
+        self.btn_action.setFixedHeight(50)
+        self.btn_action.clicked.connect(self.toggle_test)
+        layout.addWidget(self.btn_action)
+        
+        layout.addStretch()
+
+    def toggle_test(self):
+        if self.executor and self.executor.is_running:
+            self.executor.stop()
+            self.btn_action.setText("INICIAR ATAQUE")
+            self.status_label.setText("Status: Parado.")
+        else:
+            target = self.target_input.text()
+            threads = int(self.threads_input.text())
+            self.executor = DDoSExecutor(target, 80, threads)
+            self.executor.start()
+            self.btn_action.setText("PARAR ATAQUE")
+            self.status_label.setText(f"Status: Atacando {target}...")
+
 # --- CLASSE PRINCIPAL (MainWindow) ---
 
 class MainWindow(QMainWindow):
@@ -596,8 +648,8 @@ class MainWindow(QMainWindow):
         self.card_scanner = NeonCard("🛰️", "Varredura de Rede", "Identifica hosts e portas.", self.theme_manager.neon_color, self.theme_manager)
         self.card_scanner.on_card_activated = lambda: self.pages.setCurrentIndex(2) 
         
-        self.card_bruteforce = NeonCard("🔒", "Brute Force", "Teste de força de credenciais.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_bruteforce.on_card_activated = lambda: self.status_label.setText("Em desenvolvimento...")
+        self.card_bruteforce = NeonCard("🔥", "Teste de Stress", "Simulação de ataque DoS/DDoS.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_bruteforce.on_card_activated = lambda: self.pages.setCurrentIndex(9)
         
         self.card_firewall = NeonCard("🛡️", "Teste de Firewall", "Verifica regras e filtros de rede.", self.theme_manager.neon_color, self.theme_manager)
         self.card_firewall.on_card_activated = lambda: self.pages.setCurrentWidget(self.firewall_page) # Direciona para a nova página
@@ -652,6 +704,10 @@ class MainWindow(QMainWindow):
 
         self.listener_page = ListenerPage(self)
         self.pages.addWidget(self.listener_page) # Index 8
+
+        self.stress_page = StressTestPage(self)
+        self.stress_page.setObjectName("PageWidget")
+        self.pages.addWidget(self.stress_page) # Index 9
 
         # Montagem final
         content_v_layout.addWidget(self.pages)
@@ -846,9 +902,10 @@ class MainWindow(QMainWindow):
             lang_get(L, "cards.scanner.title", "Varredura de Rede"),
             lang_get(L, "cards.scanner.subtitle", "Varre e detecta hosts")
         )
+        # Dentro do update_ui_language(self, lang_code):
         self.card_bruteforce.set_texts(
-            lang_get(L, "cards.advanced.title", "Modo Avançado (Ex. Brute Force)"), # Usando uma chave temporária
-            lang_get(L, "cards.advanced.subtitle", "Funções extras / DevTools")
+            lang_get(L, "cards.stress.title", "Teste de Stress (DDoS)"), 
+            lang_get(L, "cards.stress.subtitle", "Testar resiliência do alvo")
         )
         self.card_firewall.set_texts(
             lang_get(L, "cards.ports.title", "Analisador de Portas (Ex. Firewall)"), # Usando uma chave temporária
@@ -861,7 +918,11 @@ class MainWindow(QMainWindow):
     # ----------------- closeEvent (Persistência) -----------------
     
     def closeEvent(self, event):
-        # (Código mantido)
+        # 1. Para o DDoS se estiver rodando
+        if hasattr(self, 'stress_page') and self.stress_page.executor:
+            self.stress_page.executor.stop() # Esta linha PRECISA de 4 espaços a mais que o IF
+        
+        # 2. Salva as configurações (o que você já tinha)
         self.user_settings['language'] = self.current_lang_code
         self.user_settings['theme'] = self.theme_manager.current_theme
         self.user_settings['neon_color'] = self.theme_manager.neon_color
