@@ -8,8 +8,10 @@ import subprocess
 import platform
 import socket
 import threading
+import webbrowser
+import requests
 from datetime import datetime
-
+from core.sherlock import SherlockEngine
 from PyQt6.QtCore import (
     Qt, QTimer, QTime, QSize, 
     QLocale, QThread, pyqtSignal, QPropertyAnimation, QPoint, QEasingCurve
@@ -22,7 +24,7 @@ from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QStackedWidget,
     QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QSpacerItem,
     QSizePolicy, QLineEdit, QGroupBox, QScrollArea, QGraphicsDropShadowEffect,
-    QMessageBox, QCheckBox, QSpinBox, QTextEdit
+    QMessageBox, QCheckBox, QSpinBox, QTextEdit, QGridLayout, QSpacerItem, QSizePolicy
 )
 from random import randint 
 
@@ -197,6 +199,139 @@ class ScannerPage(QWidget):
                 self.save_button.setEnabled(False)
             except Exception as e:
                 self.parent_window.status_label.setText(f"Falha ao salvar relatório: {e}")
+# --- CLASSE WORKER PARA O SHERLOCK ---
+class SherlockWorker(QThread):
+    result_found = pyqtSignal(str, str)
+    finished = pyqtSignal()
+
+    def __init__(self, username):
+        super().__init__()
+        self.username = username
+        self.engine = SherlockEngine() # Usa a lógica da pasta core
+
+    def run(self):
+        self.engine.search_user(self.username, self.result_found.emit)
+        self.finished.emit()
+
+# --- CLASSE DA INTERFACE DO SHERLOCK ---
+class SherlockPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        title = QLabel("🔍 Sherlock OSINT")
+        title.setFont(QFont("Arial", 22, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Container do Input
+        search_box = QFrame()
+        search_box.setStyleSheet("background: #1a1a1a; border-radius: 10px; padding: 5px;")
+        search_layout = QHBoxLayout(search_box)
+
+        self.user_input = QLineEdit()
+        self.user_input.setPlaceholderText("Digite o username alvo...")
+        self.user_input.setStyleSheet("border: none; background: transparent; padding: 10px; font-size: 16px; color: white;")
+        
+        # BOTÃO ESTILIZADO
+        self.btn_investigate = QPushButton("INVESTIGAR")
+        self.btn_investigate.setCursor(Qt.CursorShape.PointingHandCursor)
+        neon = self.parent_window.theme_manager.neon_color
+        self.btn_investigate.setStyleSheet(f"""
+            QPushButton {{
+                background-color: transparent;
+                border: 2px solid {neon};
+                color: {neon};
+                padding: 10px 25px;
+                border-radius: 5px;
+                font-weight: bold;
+                letter-spacing: 1px;
+            }}
+            QPushButton:hover {{
+                background-color: {neon};
+                color: #000;
+            }}
+            QPushButton:disabled {{
+                border-color: #555;
+                color: #555;
+            }}
+        """)
+        self.btn_investigate.clicked.connect(self.run_sherlock)
+
+        search_layout.addWidget(self.user_input)
+        search_layout.addWidget(self.btn_investigate)
+        layout.addWidget(search_box)
+
+        self.scroll = QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll.setStyleSheet("border: none; background: transparent;")
+        self.results_container = QWidget()
+        self.results_layout = QVBoxLayout(self.results_container)
+        self.results_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        self.scroll.setWidget(self.results_container)
+        layout.addWidget(self.scroll)
+
+    def run_sherlock(self):
+        username = self.user_input.text().strip()
+        if not username: return
+
+        for i in reversed(range(self.results_layout.count())): 
+            self.results_layout.itemAt(i).widget().setParent(None)
+
+        self.btn_investigate.setEnabled(False)
+        self.thread = SherlockWorker(username)
+        self.thread.result_found.connect(self.add_result_card)
+        # Conecta o término ao salvamento
+        self.thread.finished.connect(lambda res: self.finalize_search(username, res))
+        self.thread.start()
+
+    def finalize_search(self, username, results):
+        self.btn_investigate.setEnabled(True)
+        self.btn_investigate.setText("INVESTIGAR")
+        
+        if results:
+            # Salva o arquivo e pega o caminho completo
+            path = SherlockEngine().save_to_json(username, results, self.parent_window.base_dir)
+            filename = os.path.basename(path)
+            
+            # Atualiza o status na barra inferior
+            self.parent_window.status_label.setText(f"Relatório salvo: {filename}")
+            
+            # MOSTRA A MENSAGEM DE SUCESSO (Pop-up)
+            msg = QMessageBox(self)
+            msg.setWindowTitle("Busca Finalizada")
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setText(f"A investigação de '{username}' foi concluída!")
+            msg.setInformativeText(f"O arquivo foi gerado com sucesso em:\n\n{path}")
+            
+            # Estilização rápida do pop-up para combinar com o tema escuro
+            msg.setStyleSheet("""
+                QMessageBox { background-color: #1a1a1a; }
+                QLabel { color: white; }
+                QPushButton { 
+                    background-color: #333; color: white; 
+                    padding: 5px 15px; border-radius: 3px; 
+                }
+            """)
+            msg.exec()
+            
+        else:
+            self.parent_window.status_label.setText("Nenhum resultado encontrado.")
+            QMessageBox.warning(self, "Aviso", "Nenhuma rede social encontrada para este username.")
+
+    def add_result_card(self, site, url):
+        card = QFrame()
+        card.setStyleSheet(f"background: #222; border-left: 4px solid {self.parent_window.theme_manager.neon_color}; border-radius: 5px; margin-bottom: 5px;")
+        l = QHBoxLayout(card)
+        l.addWidget(QLabel(f"<b>{site}</b>: {url}"))
+        btn = QPushButton("Abrir")
+        btn.clicked.connect(lambda: webbrowser.open(url))
+        l.addWidget(btn)
+        self.results_layout.addWidget(card)
 
 
 class FirewallPage(QWidget):
@@ -473,6 +608,22 @@ class ListenerPage(QWidget):
                 self.status_conn.setText("Status: Conexão Perdida.")
                 self.cmd_input.setEnabled(False)
 
+# --- SHERLOCK ---
+
+class SherlockWorker(QThread):
+    result_found = pyqtSignal(str, str)
+    finished = pyqtSignal(list) # Agora envia a lista completa ao fim
+
+    def __init__(self, username):
+        super().__init__()
+        self.username = username
+        self.engine = SherlockEngine()
+
+    def run(self):
+        # A search_user agora retorna a lista de dicionários
+        results = self.engine.search_user(self.username, self.result_found.emit)
+        self.finished.emit(results)
+
 # --- DDOS ---
 
 class StressTestPage(QWidget):
@@ -584,16 +735,15 @@ class StressTestPage(QWidget):
 class MainWindow(QMainWindow):
     def safe_change_page(self, index):
         self.pages.setCurrentIndex(index)
-        self.status_label.setText(f"Página {index} carregada")
+        self.status_label.setText(f"Status: Página {index} carregada")
 
     def __init__(self, base_dir):
         super().__init__()
         self.base_dir = base_dir
         
+        # Configurações e Idioma
         self.user_settings = load_user_settings(self.base_dir)
-        
         self.theme_manager = ThemeManager(self.user_settings)
-        
         self.current_lang_code = self.user_settings.get('language', 'pt') 
         self.L = load_language_json(self.current_lang_code, self.base_dir)
         
@@ -601,9 +751,30 @@ class MainWindow(QMainWindow):
         self.setGeometry(100, 100, 1200, 800)
         
         self._build_ui()
+
+        # No final do __init__ da MainWindow
+        self.show()
+        # Isso força o Qt a processar todos os eventos de pintura pendentes
+        QApplication.processEvents() 
+        # Dá um "tapinha" no estilo para limpar o cache visual
+        self.card_scanner.update()
+        self.card_stress.update()
+        self.card_firewall.update()
+        self.card_osint.update()
+        self.card_john.update()
+        self.card_keylogger.update()
         
+        # Aplicação de Tema e Idioma (Funções que você já deve ter)
         self._apply_theme(self.theme_manager.current_theme) 
-        self.update_ui_language(self.current_lang_code)
+        #self.update_ui_language(self.current_lang_code)
+
+    def _refresh_neon_fix(self):
+        """Limpa o cache visual e remove o aspecto borrado dos cards."""
+        neon_color = self.theme_manager.neon_color
+        # Busca todos os NeonCards e força o redesenho individual [cite: 95]
+        for card in self.findChildren(NeonCard):
+            card.set_neon_color(neon_color, self.theme_manager.current_theme)
+            card.update()
 
     def _build_ui(self):
         central_widget = QWidget()
@@ -612,6 +783,7 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
+        # --- SIDEBAR ---
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(200)
         self.sidebar.setObjectName("Sidebar")
@@ -622,7 +794,6 @@ class MainWindow(QMainWindow):
         self.title_label = QLabel("AURA")
         self.title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setContentsMargins(0, 0, 0, 20)
         self.title_label.setObjectName("AuraTitle")
         sidebar_layout.addWidget(self.title_label)
         
@@ -640,118 +811,114 @@ class MainWindow(QMainWindow):
         sidebar_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
 
         self.status_label = QLabel("Status: Pronto")
-        self.status_label.setFont(QFont("Arial", 10))
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         sidebar_layout.addWidget(self.status_label)
         
         main_layout.addWidget(self.sidebar)
 
+        # --- ÁREA DE CONTEÚDO ---
         self.content_frame = QFrame() 
         self.content_frame.setObjectName("ContentFrame")
         content_v_layout = QVBoxLayout(self.content_frame)
         content_v_layout.setContentsMargins(0, 0, 0, 0)
-        content_v_layout.setSpacing(0)
         
         self.pages = QStackedWidget()
         
-        # --- CRIAÇÃO DAS PÁGINAS ---
-        
-        # Index 0: Home
+        # --- PÁGINA HOME (Index 0) ---
         home_page = QWidget()
-        home_page.setObjectName("PageWidget")
         home_layout = QVBoxLayout(home_page)
         self.welcome_label = QLabel("Bem-vindo ao AURA Security Toolkit!")
         self.welcome_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         home_layout.addWidget(self.welcome_label)
         
-        card_layout = QHBoxLayout()
-        self.card_scanner = NeonCard("🛰️", "Varredura de Rede", "Identifica hosts e portas.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_scanner.on_card_activated = lambda: self.pages.setCurrentIndex(2) 
-        
-        self.card_bruteforce = NeonCard("🔥", "Teste de Stress", "Simulação de ataque DoS/DDoS.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_bruteforce.on_card_activated = lambda: self.pages.setCurrentIndex(9)
-        
-        self.card_firewall = NeonCard("🛡️", "Teste de Firewall", "Verifica regras e filtros de rede.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_firewall.on_card_activated = lambda: self.pages.setCurrentWidget(self.firewall_page) # Direciona para a nova página
-        
-        card_layout.addWidget(self.card_scanner)
-        card_layout.addWidget(self.card_bruteforce)
-        card_layout.addWidget(self.card_firewall)
-        home_layout.addLayout(card_layout)
+        # Grid para 6 cards (2 linhas x 3 colunas)
+        card_grid = QGridLayout()
+        card_grid.setSpacing(15)
+
+        # Criando e configurando os cards
+        self.card_scanner = NeonCard("🛰️", "Varredura", "Identifica hosts.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_scanner.on_card_activated = lambda: self.safe_change_page(2) 
+
+        self.card_stress = NeonCard("🔥", "Stress Test", "Simulação DoS.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_stress.on_card_activated = lambda: self.safe_change_page(9)
+
+        self.card_firewall = NeonCard("🛡️", "Firewall", "Verifica regras.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_firewall.on_card_activated = lambda: self.safe_change_page(6)
+
+        self.card_osint = NeonCard("🔍", "Sherlock", "OSINT Social.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_osint.on_card_activated = lambda: self.safe_change_page(10)
+
+        self.card_john = NeonCard("💀", "John Ripper", "Quebra hashes.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_john.on_card_activated = lambda: self.safe_change_page(11)
+
+        self.card_keylogger = NeonCard("⌨️", "Key Auditor", "Log de teclado.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_keylogger.on_card_activated = lambda: self.safe_change_page(12)
+
+        # Adicionando ao Grid (Linha, Coluna)
+        card_grid.addWidget(self.card_scanner, 0, 0)
+        card_grid.addWidget(self.card_stress, 0, 1)
+        card_grid.addWidget(self.card_firewall, 0, 2)
+        card_grid.addWidget(self.card_osint, 1, 0)
+        card_grid.addWidget(self.card_john, 1, 1)
+        card_grid.addWidget(self.card_keylogger, 1, 2)
+
+        home_layout.addLayout(card_grid)
         home_layout.addStretch()
-        self.pages.addWidget(home_page) # Adicionado no Index 0
+        self.pages.addWidget(home_page) # Index 0
 
-        # Index 1: Ferramentas
-        tools_page = QWidget()
-        tools_page.setObjectName("PageWidget")
-        tools_v_layout = QVBoxLayout(tools_page)
-        tools_v_layout.addWidget(QLabel("Página Ferramentas - em desenvolvimento"))
-        self.pages.addWidget(tools_page) # Index 1
-
-        # Index 2: Scanner
+        # --- REGISTRO DAS PÁGINAS (Índices 1 a 12) ---
+        self.pages.addWidget(QLabel("Página Ferramentas (1)")) # Index 1
+        
         self.scanner_page = ScannerPage(self)
-        self.scanner_page.setObjectName("PageWidget")
         self.pages.addWidget(self.scanner_page) # Index 2
         
-        # Index 3: Scripts
-        scripts_page = QWidget()
-        scripts_page.setObjectName("PageWidget")
-        scripts_v_layout = QVBoxLayout(scripts_page)
-        scripts_v_layout.addWidget(QLabel("Página Scripts - em desenvolvimento"))
-        self.pages.addWidget(scripts_page) # Index 3
+        self.pages.addWidget(QLabel("Página Scripts (3)")) # Index 3
+        self.pages.addWidget(QLabel("Página Logs (4)")) # Index 4
         
-        # Index 4: Logs
-        logs_page = QWidget()
-        logs_page.setObjectName("PageWidget")
-        logs_v_layout = QVBoxLayout(logs_page)
-        logs_v_layout.addWidget(QLabel("Página Logs - em desenvolvimento"))
-        self.pages.addWidget(logs_page) # Index 4
-        
-        # Index 5: Configurações
         self.config_page = ConfigPage(self)
-        self.config_page.setObjectName("PageWidget")
         self.pages.addWidget(self.config_page) # Index 5
 
-        # Index 6: Teste de Firewall (A NOVA PÁGINA)
         self.firewall_page = FirewallPage(self)
-        self.firewall_page.setObjectName("PageWidget")
         self.pages.addWidget(self.firewall_page) # Index 6
 
-        # Index 7: Página de Payload
         self.payload_page = PayloadPage(self)
-        self.payload_page.setObjectName("PageWidget")
         self.pages.addWidget(self.payload_page) # Index 7
 
         self.listener_page = ListenerPage(self)
         self.pages.addWidget(self.listener_page) # Index 8
 
         self.stress_page = StressTestPage(self)
-        self.stress_page.setObjectName("PageWidget")
         self.pages.addWidget(self.stress_page) # Index 9
 
-        # Montagem final
+        # --- AS NOVAS PÁGINAS (Indices 10, 11, 12) ---
+        # --- Index 10: Sherlock OSINT (Substitua as linhas antigas por estas) ---
+        self.osint_page = SherlockPage(self) # Cria a interface real
+        self.pages.insertWidget(10, self.osint_page) 
+        # Remova a linha antiga que criava o QWidget com a label "Módulo Sherlock OSINT"
+
+        self.john_page = QWidget(); self.john_page.setLayout(QVBoxLayout()); self.john_page.layout().addWidget(QLabel("Módulo John The Ripper"))
+        self.pages.addWidget(self.john_page) # Index 11
+
+        self.keylogger_page = QWidget(); self.keylogger_page.setLayout(QVBoxLayout()); self.keylogger_page.layout().addWidget(QLabel("Módulo Key Auditor"))
+        self.pages.addWidget(self.keylogger_page) # Index 12
+
+        # Finalização
         content_v_layout.addWidget(self.pages)
         main_layout.addWidget(self.content_frame)
 
-        self.btn_home.clicked.connect(lambda: self.pages.setCurrentIndex(0))
-        self.btn_tools.clicked.connect(lambda: self.pages.setCurrentIndex(1))
-        self.btn_scanner.clicked.connect(lambda: self.pages.setCurrentIndex(2))
-        self.btn_scripts.clicked.connect(lambda: self.pages.setCurrentIndex(3))
-        self.btn_logs.clicked.connect(lambda: self.pages.setCurrentIndex(4))
-        self.btn_config.clicked.connect(lambda: self.pages.setCurrentIndex(5))
+        # Conexões Sidebar
+        self.btn_home.clicked.connect(lambda: self.safe_change_page(0))
+        self.btn_tools.clicked.connect(lambda: self.safe_change_page(1))
+        self.btn_scanner.clicked.connect(lambda: self.safe_change_page(2))
+        self.btn_scripts.clicked.connect(lambda: self.safe_change_page(3))
+        self.btn_logs.clicked.connect(lambda: self.safe_change_page(4))
+        self.btn_config.clicked.connect(lambda: self.safe_change_page(5))
 
     def _make_sidebar_button(self, text, icon):
         btn = QPushButton(f"  {icon} {text}")
         btn.setObjectName("SidebarButton")
-        btn.setFixedHeight(40)
-        btn.setFont(QFont("Arial", 12))
+        btn.setFixedHeight(45)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn.setStyleSheet("""
-            QPushButton#SidebarButton { 
-                text-align: left; 
-                padding-left: 15px; 
-            }
-        """)
+        # O estilo CSS idealmente deve vir do theme_manager ou um arquivo .qss
         return btn
 
     # ----------------- Gerenciamento de Tema -----------------
@@ -871,7 +1038,16 @@ class MainWindow(QMainWindow):
         self._apply_theme(self.theme_manager.current_theme) 
 
     def apply_language(self, lang_name):
-        """Chamado pela ConfigPage para mudar o idioma."""
+        # ... (seu código de mapeamento atual) ... 
+        
+        new_L = load_language_json(lang_code, self.base_dir) 
+        self.L = new_L
+        self.current_lang_code = lang_code
+        
+        self.update_ui_language(lang_code) [cite: 98]
+        
+        # ADICIONE ESTA LINHA: Força o redesenho nítido após a troca de texto
+        QTimer.singleShot(50, self._refresh_neon_fix)
         
         lang_map = {
             "Português": "pt", "Inglês": "en", "Espanhol": "es", 
@@ -912,7 +1088,7 @@ class MainWindow(QMainWindow):
             lang_get(L, "cards.scanner.title", "Varredura de Rede"),
             lang_get(L, "cards.scanner.subtitle", "Varre e detecta hosts")
         )
-        self.card_bruteforce.set_texts(
+        self.card_stress(
             lang_get(L, "cards.stress.title", "Teste de Stress (DDoS)"), 
             lang_get(L, "cards.stress.subtitle", "Testar resiliência do alvo")
         )

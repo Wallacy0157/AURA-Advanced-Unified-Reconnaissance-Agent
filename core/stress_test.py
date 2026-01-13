@@ -3,6 +3,7 @@ import threading
 import time
 import json
 import csv
+import ssl
 import os
 from datetime import datetime
 
@@ -26,53 +27,73 @@ class StressTestExecutor:
             "avg_latency": 0.0
         }
 
+    import ssl
+
     def _probe(self):
-        """Envia a sonda e atualiza a 'gaveta' stats que a UI lê."""
         start_time = time.time()
         timestamp = datetime.now().isoformat()
         status = "unknown"
         latency = 0
-        
+
         try:
-            # Incrementa tentativa antes de enviar
             self.stats["total_sent"] += 1
-            
-            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            s.settimeout(3.0) 
-            
-            conn_result = s.connect_ex((self.target, self.port))
-            latency = (time.time() - start_time) * 1000 
-            
-            if conn_result == 0:
-                status = "SUCCESS"
-                self.stats["success"] += 1
-                s.send(b"GET / HTTP/1.1\r\nHost: aura.test\r\n\r\n")
-            elif conn_result in [111, 10061]: # Connection Refused
-                status = "REJECT (RST)"
-                self.stats["reset_reject"] += 1
-            elif conn_result in [110, 10060]: # Timeout
-                status = "DROP (Timeout)"
-                self.stats["timeout_drop"] += 1
-            else:
-                status = f"ERROR_{conn_result}"
-                self.stats["errors"] += 1
-                
-            s.close()
-        except Exception:
+
+            raw_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            raw_sock.settimeout(3.0)
+
+            context = ssl.create_default_context()
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE  # ambiente controlado
+
+            tls_sock = context.wrap_socket(
+                raw_sock,
+                server_hostname=self.target
+            )
+
+            conn_start = time.time()
+            tls_sock.connect((self.target, self.port))
+            latency = (time.time() - conn_start) * 1000
+
+            tls_sock.sendall(
+                b"GET / HTTP/1.1\r\n"
+                b"Host: aura.test\r\n"
+                b"Connection: close\r\n\r\n"
+            )
+
+            status = "SUCCESS"
+            self.stats["success"] += 1
+
+            tls_sock.close()
+
+        except ssl.SSLError:
+            status = "TLS_ERROR"
+            self.stats["errors"] += 1
+
+        except socket.timeout:
             status = "DROP (Timeout)"
             self.stats["timeout_drop"] += 1
-            
-        # Atualiza latência média
+
+        except ConnectionResetError:
+            status = "REJECT (RST)"
+            self.stats["reset_reject"] += 1
+
+        except Exception:
+            status = "ERROR"
+            self.stats["errors"] += 1
+
         if status == "SUCCESS":
             old_avg = self.stats["avg_latency"]
-            self.stats["avg_latency"] = (old_avg + latency) / 2 if old_avg > 0 else latency
-        
+            self.stats["avg_latency"] = (
+                (old_avg + latency) / 2 if old_avg > 0 else latency
+            )
+
         self.results.append({
             "timestamp": timestamp,
             "port": self.port,
             "status": status,
             "latency_ms": round(latency, 2)
         })
+
 
     def run(self):
         self.is_running = True
