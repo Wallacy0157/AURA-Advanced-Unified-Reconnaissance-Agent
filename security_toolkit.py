@@ -13,23 +13,20 @@ import requests
 from datetime import datetime
 from core.sherlock import SherlockEngine
 from PyQt6.QtCore import (
-    Qt, QTimer, QTime, QSize, 
-    QLocale, QThread, pyqtSignal, QPropertyAnimation, QPoint, QEasingCurve
+    Qt, QTimer, QTime, QSize, QLocale, QThread, pyqtSignal, QPropertyAnimation, QPoint, QEasingCurve, QTimer
 )
 from PyQt6.QtGui import (
-    QFont, QIcon, QColor, QPalette, QBrush, QPixmap, 
-    QPainter, QRegion
+    QFont, QIcon, QColor, QPalette, QBrush, QPixmap, QPainter, QRegion
 )
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QWidget, QLabel, QStackedWidget,
     QVBoxLayout, QHBoxLayout, QFrame, QPushButton, QSpacerItem,
     QSizePolicy, QLineEdit, QGroupBox, QScrollArea, QGraphicsDropShadowEffect,
-    QMessageBox, QCheckBox, QSpinBox, QTextEdit, QGridLayout, QSpacerItem, QSizePolicy
+    QMessageBox, QCheckBox, QSpinBox, QTextEdit, QGridLayout, QSpacerItem, 
+    QSizePolicy, QFileDialog, QComboBox
 )
-from random import randint 
-
+from random import randint
 from core.stress_test import StressTestExecutor
-
 from core.components import (
     NeonCard, ConfigPage, 
     load_language_json, lang_get 
@@ -39,7 +36,8 @@ from core.config import (
     THEMES, NEON_DEFAULT, load_user_settings,
     save_user_settings, ThemeManager 
 )
-
+from core.john_engine import JohnEngine
+from core.logger_engine import KeyloggerEngine
 
 # --- 1. CLASSE WORKER (Para não congelar a UI durante o Nmap) ---
 class ScannerWorker(QThread):
@@ -199,19 +197,21 @@ class ScannerPage(QWidget):
                 self.save_button.setEnabled(False)
             except Exception as e:
                 self.parent_window.status_label.setText(f"Falha ao salvar relatório: {e}")
+
 # --- CLASSE WORKER PARA O SHERLOCK ---
 class SherlockWorker(QThread):
     result_found = pyqtSignal(str, str)
-    finished = pyqtSignal()
+    finished = pyqtSignal(list)
 
     def __init__(self, username):
         super().__init__()
         self.username = username
-        self.engine = SherlockEngine() # Usa a lógica da pasta core
+        self.engine = SherlockEngine()
 
     def run(self):
-        self.engine.search_user(self.username, self.result_found.emit)
-        self.finished.emit()
+        # MUDANÇA AQUI: Agora usamos a busca global "everywhere"
+        results = self.engine.search_everywhere(self.username, self.result_found.emit)
+        self.finished.emit(results)
 
 # --- CLASSE DA INTERFACE DO SHERLOCK ---
 class SherlockPage(QWidget):
@@ -325,12 +325,31 @@ class SherlockPage(QWidget):
 
     def add_result_card(self, site, url):
         card = QFrame()
-        card.setStyleSheet(f"background: #222; border-left: 4px solid {self.parent_window.theme_manager.neon_color}; border-radius: 5px; margin-bottom: 5px;")
+        # Se for DuckDuckGo, vamos colocar uma cor de borda diferente (ex: Laranja)
+        border_color = "#ff8c00" if site == "DuckDuckGo" else self.parent_window.theme_manager.neon_color
+        
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: #222; 
+                border-left: 4px solid {border_color}; 
+                border-radius: 5px; 
+                margin-bottom: 5px;
+            }}
+        """)
+        
         l = QHBoxLayout(card)
-        l.addWidget(QLabel(f"<b>{site}</b>: {url}"))
+        # Limita o tamanho da URL para não quebrar o layout
+        display_url = (url[:60] + '...') if len(url) > 60 else url
+        
+        label_text = f"<b>{site}</b><br><span style='color: #aaa;'>{display_url}</span>"
+        l.addWidget(QLabel(label_text))
+        
+        l.addStretch()
         btn = QPushButton("Abrir")
+        btn.setFixedWidth(80)
         btn.clicked.connect(lambda: webbrowser.open(url))
         l.addWidget(btn)
+        
         self.results_layout.addWidget(card)
 
 
@@ -415,7 +434,6 @@ class FirewallPage(QWidget):
             self.log_output.setText(f"<b>[ERRO]</b>: {e}")
 
     def update_log_view(self, path):
-        """ESTE ERA O MÉTODO QUE ESTAVA FALTANDO!"""
         try:
             if os.path.exists(path):
                 with open(path, "r", encoding="utf-8") as f:
@@ -608,8 +626,303 @@ class ListenerPage(QWidget):
                 self.status_conn.setText("Status: Conexão Perdida.")
                 self.cmd_input.setEnabled(False)
 
-# --- SHERLOCK ---
+# --- JOHN THE RIPPER ---
+class JohnWorker(QThread):
+    progress = pyqtSignal(int, int) 
+    finished = pyqtSignal(dict)
 
+    def __init__(self, target_hash, payload, algorithm, salt=None, mode="wordlist", rules=False):
+        super().__init__()
+        self.target_hash = target_hash
+        self.payload = payload # Pode ser o caminho da wordlist ou a string da máscara
+        self.algorithm = algorithm
+        self.salt = salt
+        self.mode = mode
+        self.rules = rules
+        self.engine = JohnEngine()
+
+    def run(self):
+        if self.mode == "wordlist":
+            result = self.engine.crack_wordlist(
+                target_hash=self.target_hash, 
+                wordlist_path=self.payload, 
+                algorithm=self.algorithm, 
+                salt=self.salt,
+                use_rules=self.rules,
+                callback=self.progress.emit
+            )
+        else:
+            result = self.engine.crack_mask(
+                target_hash=self.target_hash, 
+                mask=self.payload, 
+                algorithm=self.algorithm, 
+                salt=self.salt,
+                callback=self.progress.emit
+            )
+        self.finished.emit(result)
+
+class JohnPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.wordlist_path = "" # Inicializa aqui
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        # Título
+        title = QLabel("💀 John The Ripper - Hash Cracker")
+        title.setFont(QFont("Arial", 22, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # --- Seção Comum (Sempre Visível) ---
+        common_group = QGroupBox("Configurações Básicas")
+        common_group.setStyleSheet("QGroupBox { color: #888; border: 1px solid #333; margin-top: 10px; padding: 10px; }")
+        common_layout = QVBoxLayout()
+
+        common_layout.addWidget(QLabel("Hash Alvo:"))
+        self.hash_input = QLineEdit()
+        self.hash_input.setPlaceholderText("Insira o hash aqui...")
+        common_layout.addWidget(self.hash_input)
+
+        row2 = QHBoxLayout()
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItems(["Wordlist", "Máscara"])
+        self.mode_combo.currentTextChanged.connect(self.toggle_mode)
+        row2.addWidget(QLabel("Modo de Ataque:"))
+        row2.addWidget(self.mode_combo)
+
+        self.algo_combo = QComboBox()
+        self.algo_combo.addItems(["Auto-Detectar", "MD5", "SHA1", "SHA256", "SHA512"])
+        row2.addWidget(QLabel("Algoritmo:"))
+        row2.addWidget(self.algo_combo)
+        
+        common_layout.addLayout(row2)
+        common_group.setLayout(common_layout)
+        layout.addWidget(common_group)
+
+        # --- Seção WORDLIST (Container dinâmico) ---
+        self.wordlist_container = QWidget()
+        wordlist_l = QVBoxLayout(self.wordlist_container)
+        
+        row_wl = QHBoxLayout()
+        self.btn_wordlist = QPushButton("Selecionar Arquivo Wordlist")
+        self.btn_wordlist.clicked.connect(self.select_file)
+        row_wl.addWidget(self.btn_wordlist)
+        
+        self.check_rules = QCheckBox("Aplicar Regras (John Style)")
+        row_wl.addWidget(self.check_rules)
+        wordlist_l.addLayout(row_wl)
+        
+        layout.addWidget(self.wordlist_container)
+
+        # --- Seção MÁSCARA (Container dinâmico) ---
+        self.mask_container = QWidget()
+        mask_l = QVBoxLayout(self.mask_container)
+        
+        self.mask_input = QLineEdit()
+        self.mask_input.setPlaceholderText("Ex: ?l?l?l?d?d (L=letra, D=digito)")
+        mask_l.addWidget(QLabel("Definição da Máscara:"))
+        mask_l.addWidget(self.mask_input)
+        
+        layout.addWidget(self.mask_container)
+        self.mask_container.hide() # Começa escondido
+
+        # --- Salt e Botão ---
+        self.salt_input = QLineEdit()
+        self.salt_input.setPlaceholderText("Salt (Opcional)")
+        layout.addWidget(QLabel("Salt/Sal:"))
+        layout.addWidget(self.salt_input)
+
+        self.btn_start = QPushButton("INICIAR ATAQUE")
+        self.btn_start.setFixedHeight(50)
+        self.btn_start.setStyleSheet(f"background: {self.parent_window.theme_manager.neon_color}; color: black; font-weight: bold;")
+        self.btn_start.clicked.connect(self.start_cracking)
+        layout.addWidget(self.btn_start)
+
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setStyleSheet("background: #000; color: #0f0; font-family: 'Courier New';")
+        layout.addWidget(self.console)
+
+    # Função que limpa a tela dependendo do modo
+    def toggle_mode(self, mode):
+        if mode == "Wordlist":
+            self.wordlist_container.show()
+            self.mask_container.hide()
+        else:
+            self.wordlist_container.hide()
+            self.mask_container.show()
+
+    def select_file(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Selecionar Wordlist", "", "Text Files (*.txt)")
+        if file:
+            self.wordlist_path = file
+            self.btn_wordlist.setText(os.path.basename(file))
+
+    def start_cracking(self):
+        target = self.hash_input.text().strip()
+        salt = self.salt_input.text().strip() or None
+        algo = self.algo_combo.currentText()
+        if algo == "Auto-Detectar": algo = None
+        
+        modo = self.mode_combo.currentText()
+
+        if not target:
+            QMessageBox.warning(self, "Erro", "Insira o Hash!")
+            return
+
+        self.console.clear()
+        self.btn_start.setEnabled(False)
+        self.btn_start.setText("EXECUTANDO...")
+
+        if modo == "Wordlist":
+            if not self.wordlist_path:
+                QMessageBox.warning(self, "Erro", "Selecione a wordlist!")
+                self.btn_start.setEnabled(True)
+                return
+            self.thread = JohnWorker(target, self.wordlist_path, algo, salt, mode="wordlist", rules=self.check_rules.isChecked())
+        else:
+            mask = self.mask_input.text().strip()
+            if not mask:
+                QMessageBox.warning(self, "Erro", "Insira a máscara!")
+                self.btn_start.setEnabled(True)
+                return
+            self.thread = JohnWorker(target, mask, algo, salt, mode="mask")
+
+        self.thread.progress.connect(self.update_status)
+        self.thread.finished.connect(self.on_finished)
+        self.thread.start()
+
+    def update_status(self, tested, speed):
+        # Atualiza a barra de status lá embaixo (limpo)
+        msg = f"John: {tested} hashes testados | Velocidade: {speed} H/s"
+        self.parent_window.status_label.setText(msg)
+        
+        # Só escreve no console a cada 5000 tentativas para não travar e nem poluir
+        if tested % 5000 == 0:
+            self.console.append(f"[*] Processando... {tested} candidatos testados.")
+
+    def on_finished(self, result):
+        self.btn_start.setEnabled(True)
+        self.btn_start.setText("INICIAR ATAQUE")
+        if result["success"]:
+            path = self.thread.engine.save_result(result, self.parent_window.base_dir)
+            msg = f"✅ SENHA ENCONTRADA: {result['password']}\nRelatório: {os.path.basename(path)}"
+            self.console.append("\n" + "="*30 + "\n" + msg + "\n" + "="*30)
+            QMessageBox.information(self, "Sucesso", msg)
+        else:
+            self.console.append(f"\n❌ FALHA: {result['error']}")
+
+# --- KEYLOGGER ---
+class KeyloggerPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.engine = None
+        self.log_file_path = None
+        
+        # Timer para atualizar a tela em tempo real
+        self.update_timer = QTimer()
+        self.update_timer.timeout.connect(self.refresh_live_view)
+        
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(30, 30, 30, 30)
+
+        # Título Estilizado
+        title = QLabel("⌨️ Key Auditor - Monitoramento")
+        title.setFont(QFont("Arial", 22, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Painel de Status
+        self.status_box = QFrame()
+        self.status_box.setStyleSheet("background: #111; border: 1px solid #333; border-radius: 8px;")
+        status_layout = QHBoxLayout(self.status_box)
+        
+        self.dot = QLabel("●") # Indicador visual (vermelho/cinza)
+        self.dot.setStyleSheet("color: #444; font-size: 20px;")
+        
+        self.status_text = QLabel("STATUS: PRONTO PARA CAPTURA")
+        self.status_text.setStyleSheet("color: #888; font-weight: bold;")
+        
+        status_layout.addWidget(self.dot)
+        status_layout.addWidget(self.status_text)
+        status_layout.addStretch()
+        layout.addWidget(self.status_box)
+
+        # Console de Visualização em Tempo Real
+        layout.addWidget(QLabel("Atividade Recente:"))
+        self.live_console = QTextEdit()
+        self.live_console.setReadOnly(True)
+        self.live_console.setStyleSheet("background: #000; color: #0f0; font-family: 'Courier New'; border: 1px solid #222;")
+        layout.addWidget(self.live_console)
+
+        # Botões de Controle
+        btns = QHBoxLayout()
+        
+        self.btn_toggle = QPushButton("INICIAR AUDITORIA")
+        self.btn_toggle.setFixedHeight(50)
+        self.btn_toggle.setStyleSheet(f"background: {self.parent_window.theme_manager.neon_color}; color: black; font-weight: bold;")
+        self.btn_toggle.clicked.connect(self.handle_toggle)
+        
+        self.btn_open_folder = QPushButton("📁 ABRIR LOGS")
+        self.btn_open_folder.clicked.connect(self.open_log_folder)
+        self.btn_open_folder.setStyleSheet("padding: 15px;")
+
+        btns.addWidget(self.btn_toggle, 3)
+        btns.addWidget(self.btn_open_folder, 1)
+        layout.addLayout(btns)
+
+    def handle_toggle(self):
+        # Se não estiver rodando, inicia
+        if not self.engine or not self.engine.is_running:
+            log_dir = os.path.join(self.parent_window.base_dir, "logs/keylogs")
+            self.engine = KeyloggerEngine(log_dir)
+            self.log_file_path = self.engine.start()
+            
+            # UI Updates
+            self.status_text.setText("MONITORANDO TECLADO...")
+            self.status_text.setStyleSheet("color: #ff3333;")
+            self.dot.setStyleSheet("color: #ff3333;")
+            self.btn_toggle.setText("PARAR MONITORAMENTO")
+            self.btn_toggle.setStyleSheet("background: #551111; color: white; font-weight: bold;")
+            
+            self.update_timer.start(1000) # Atualiza a tela a cada 1 segundo
+        
+        # Se estiver rodando, para
+        else:
+            self.engine.stop()
+            self.update_timer.stop()
+            self.status_text.setText("AUDITORIA FINALIZADA")
+            self.status_text.setStyleSheet("color: #00ff00;")
+            self.dot.setStyleSheet("color: #00ff00;")
+            self.btn_toggle.setText("REINICIAR CAPTURA")
+            self.btn_toggle.setStyleSheet(f"background: {self.parent_window.theme_manager.neon_color}; color: black;")
+
+    def refresh_live_view(self):
+        """Lê o arquivo de log e mostra as últimas teclas no console"""
+        if self.log_file_path and os.path.exists(self.log_file_path):
+            try:
+                with open(self.log_file_path, "r", encoding="utf-8") as f:
+                    content = f.read()
+                    # Mostra apenas os últimos 1000 caracteres para não travar a UI
+                    self.live_console.setText(content[-1000:])
+                    self.live_console.moveCursor(QTextCursor.MoveOperation.End)
+            except:
+                pass
+
+    def open_log_folder(self):
+        log_dir = os.path.join(self.parent_window.base_dir, "logs/keylogs")
+        os.makedirs(log_dir, exist_ok=True)
+        # Comando para abrir pasta no Linux
+        os.system(f"xdg-open {log_dir}")
+
+# --- SHERLOCK ---
 class SherlockWorker(QThread):
     result_found = pyqtSignal(str, str)
     finished = pyqtSignal(list) # Agora envia a lista completa ao fim
@@ -625,7 +938,6 @@ class SherlockWorker(QThread):
         self.finished.emit(results)
 
 # --- DDOS ---
-
 class StressTestPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
@@ -731,7 +1043,6 @@ class StressTestPage(QWidget):
             self.btn_action.setText("⚡ INICIAR AUDITORIA DE TRÁFEGO")
 
 # --- CLASSE PRINCIPAL (MainWindow) ---
-
 class MainWindow(QMainWindow):
     def safe_change_page(self, index):
         self.pages.setCurrentIndex(index)
@@ -889,17 +1200,14 @@ class MainWindow(QMainWindow):
         self.stress_page = StressTestPage(self)
         self.pages.addWidget(self.stress_page) # Index 9
 
-        # --- AS NOVAS PÁGINAS (Indices 10, 11, 12) ---
-        # --- Index 10: Sherlock OSINT (Substitua as linhas antigas por estas) ---
-        self.osint_page = SherlockPage(self) # Cria a interface real
-        self.pages.insertWidget(10, self.osint_page) 
-        # Remova a linha antiga que criava o QWidget com a label "Módulo Sherlock OSINT"
+        self.osint_page = SherlockPage(self)
+        self.pages.insertWidget(10, self.osint_page) # Index 10
 
-        self.john_page = QWidget(); self.john_page.setLayout(QVBoxLayout()); self.john_page.layout().addWidget(QLabel("Módulo John The Ripper"))
-        self.pages.addWidget(self.john_page) # Index 11
+        self.john_page = JohnPage(self) 
+        self.pages.insertWidget(11, self.john_page) # Index 11
 
-        self.keylogger_page = QWidget(); self.keylogger_page.setLayout(QVBoxLayout()); self.keylogger_page.layout().addWidget(QLabel("Módulo Key Auditor"))
-        self.pages.addWidget(self.keylogger_page) # Index 12
+        self.key_auditor_page = KeyloggerPage(self)
+        self.pages.insertWidget(12, self.key_auditor_page) # Index 12
 
         # Finalização
         content_v_layout.addWidget(self.pages)
