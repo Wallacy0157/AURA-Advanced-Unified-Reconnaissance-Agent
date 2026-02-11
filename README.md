@@ -148,4 +148,4 @@ O uso indevido é de responsabilidade exclusiva de quem executa.
 
 ## 📜 Licença
 
-Uso interno / educacional (ajuste conforme política do seu time ou organização).
+Uso interno / educacional.
