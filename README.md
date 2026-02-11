@@ -1,12 +1,13 @@
 # 🌌 AURA — Advanced Unified Reconnaissance Agent
 
-**Dashboard Avançado em Python + PyQt6 para Operações de Segurança Interna**
+**Security Toolkit em Python + PyQt6 para validações técnicas em ambiente controlado**
 
-O **AURA** é um painel moderno e interativo desenvolvido em **PyQt6**, projetado para reunir e gerenciar todas as ferramentas de segurança utilizadas em ambiente interno. Ele centraliza scanners, ferramentas de automação, scripts de análise, verificações de ambiente, relatórios e módulos de configuração.
+O **AURA** é uma aplicação desktop com interface **Neon Dark Mode** construída em **PyQt6**.  
+Ele centraliza módulos de **reconhecimento, testes técnicos, auditoria e apoio operacional** em um único painel.
 
-> ⚠️ **Uso exclusivo para testes autorizados**.
-> Não executa atividades maliciosas, não coleta informações sigilosas, não copia dados e não envia nada para fora da rede.
-> Toda lógica é 100% focada em **mapear falhas**, **validar controles** e **auxiliar no reforço da segurança**.
+> ⚠️ **Uso educacional e autorizado apenas.**  
+> Vários módulos executam ações sensíveis (scanner, força bruta, auditoria de teclado, execução remota, etc.).  
+> Utilize somente em laboratórios próprios ou com autorização formal.
 
 ---
 
@@ -14,24 +15,23 @@ O **AURA** é um painel moderno e interativo desenvolvido em **PyQt6**, projetad
 
 ### 🧭 **Interface Neon Dark Mode**
 
-* Estilo escuro com efeitos neon suaves.
-* Cards animados com brilho pulsante (Glow Effect).
-* Layout organizado em sidebar + área dinâmica.
-* Totalmente escalável a qualquer resolução.
+* Layout em sidebar + área dinâmica (QStackedWidget).
+* Cards neon com efeitos visuais (glow / hover).
+* Tema claro/escuro com personalização de cor neon.
+* Suporte a múltiplos idiomas via JSON.
 
-### 🧩 **Módulos Disponíveis no Painel**
+### 🧩 **Módulos Implementados no Projeto**
 
-Cada card no painel principal representa um sistema do AURA:
+Atualmente o código inclui os seguintes módulos/páginas principais:
 
-* **🛰️ Scanner de Rede** — Varredura e detecção de hosts
-* **🚪 Analisador de Portas** — Teste de portas e respostas
-* **📊 Relatórios** — Geração de CSV, logs e auditorias
-* **🧪 Scripts Automáticos** — Execução de rotinas Python e .bat
-* **🎯 Alvos** — Gerenciamento rápido de IPs e ranges
-* **📁 Logs do Sistema** — Histórico de execuções
-* **⚙️ Modo Avançado** — Funções extras, debug e devtools
-* **📡 Status** — Verificação do ambiente
-* **🔧 Configurações** — Ajustes gerais
+* **🛰️ Scanner de Rede** — Nmap (`-sV -O --script vuln`) + parsing XML + sugestões (Nikto/SQLMap/Hydra)
+* **🧰 Hydra** — Execução de testes de credenciais com opções de usuário/senha/listas e HTTP form
+* **💀 John Engine** — Quebra de hash com wordlist/rules/bruteforce (MD5, SHA1, SHA256, SHA512 e BCRYPT quando disponível)
+* **🔍 Sherlock / OSINT** — Busca por usernames/nomes em fontes sociais e consulta global
+* **⌨️ Key Auditor** — Captura de digitação em arquivo local para auditoria autorizada
+* **🛡️ Firewall / Port Check** — Verificação de conectividade de portas
+* **🔥 Stress Test** — Teste de carga básico com coleta de evidências em JSON/CSV
+* **📦 Payload Builder + Listener** — Geração de agente Python e listener TCP para laboratório
 
 ---
 
@@ -39,12 +39,10 @@ Cada card no painel principal representa um sistema do AURA:
 
 ### 🎨 **Tema do App**
 
-* Modo **Claro**
-* Modo **Escuro** (padrão)
+* **Dark**
+* **Light**
 
-### 🌈 **Cores Neon**
-
-Escolha entre:
+### 🌈 **Cor Neon**
 
 * Roxo (padrão)
 * Vermelho
@@ -52,85 +50,102 @@ Escolha entre:
 * Azul
 * Rosa
 * Amarelo
-* Ou totalmente **sem brilho neon**
+* Sem efeito neon
 
-### 🏷️ **Temas Especiais**  (Ainda em Desenvolvimento)
-
-* 🎄 Natal
-* 🎃 Halloween
-* 🐰 Páscoa
-* 🇧🇷 Tema Brasil
-* Nenhum (padrão)
-
-### 🌐 **Idiomas do Sistema**
+### 🌐 **Idiomas Suportados**
 
 * Português
 * Inglês
 * Espanhol
 * Francês
 * Italiano
+* Alemão
 * Russo
 * Chinês
 * Coreano
 * Japonês
-* Alemão
 * Árabe
 
 ---
 
-## 🧠 **Arquitetura do Projeto**
+## 🧠 **Arquitetura (resumo)**
 
-### Principais classes:
+### Arquivo principal
 
-* **NeonCard** → Cards com glow + hover dinâmico.
-* **ConfigPage** → Página completa de configurações.
-* **MainWindow** → Estrutura principal do dashboard.
+* `security_toolkit.py` — janela principal (`MainWindow`) e páginas de módulo.
 
-### Tecnologias utilizadas:
+### Pasta `core/`
 
-* **Python 3**
-* **PyQt6**
-* **Efeitos QSS / QGraphicsDropShadowEffect**
-* **QPropertyAnimation** (pulso neon)
+* `components.py` — componentes visuais (`NeonCard`, `ConfigPage`) e internacionalização.
+* `config.py` — tema, cor neon e persistência de configurações.
+* `network_scanner.py` — varredura Nmap, parse de resultados e integrações web assessment.
+* `hydra_engine.py` — worker para Hydra.
+* `john_engine.py` — engine de cracking de hash.
+* `sherlock.py` — módulo OSINT.
+* `logger_engine.py` — motor de auditoria de teclado.
+* `stress_test.py` — executor de teste de carga.
+* `remote_handler.py` — payload/listerner para ambiente de teste.
+
+### Outras pastas
+
+* `languages/` — traduções da UI.
+* `config/user_settings.json` — preferências salvas do usuário.
+* `logs/` — relatórios e evidências gerados em runtime.
 
 ---
 
 ## ▶️ **Como executar**
 
-```bash
-python3 aura_dashboard.py
-```
-
-Necessário ter:
-
-* Python 3.9+
-* PyQt6 instalado
+### 1) Instalar dependências
 
 ```bash
-pip install PyQt6
+pip install -r requirements.txt
 ```
+
+### 2) Rodar o app
+
+```bash
+python3 security_toolkit.py
+```
+
+---
+
+## 📦 **Dependências principais**
+
+* PyQt6
+* requests
+* ddgs
+* xmltodict
+* passlib
+* pynput
+* beautifulsoup4
+* pytz
+
+Além das libs Python, alguns módulos dependem de ferramentas externas no sistema:
+
+* `nmap`
+* `hydra`
+* `nikto` (opcional)
+* `sqlmap` (opcional)
 
 ---
 
 ## 📘 **Status do Projeto**
 
-✔ UI Finalizada
-
-✔ Cards funcionais
-
-✔ Configurações ativas
-
-◻ Mais ferramentas internas sendo integradas
+✔ Interface principal funcional  
+✔ Persistência de tema/idioma  
+✔ Módulos integrados no dashboard  
+◻ Evoluções em andamento (organização, hardening e refinos de UX)
 
 ---
 
 ## 🛡️ Aviso Legal
 
-Este software **não possui** nenhuma funcionalidade voltada para roubo de dados, invasão externa, coleta de informações sigilosas ou qualquer ação ilícita.
-É estritamente uma ferramenta de **segurança defensiva**.
+Este projeto inclui módulos de segurança ofensiva e defensiva para **simulação, validação técnica e estudo**.
+O uso indevido é de responsabilidade exclusiva de quem executa.
 
 ---
 
 ## 📜 Licença
 
-Uso interno e restrito. Direitos reservados aos autores.
+Uso interno / educacional (ajuste conforme política do seu time ou organização).
