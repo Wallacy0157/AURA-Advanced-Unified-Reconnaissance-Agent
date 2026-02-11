@@ -10,6 +10,8 @@ import socket
 import threading
 import webbrowser
 import requests
+import tempfile
+import uuid
 from datetime import datetime
 from core.sherlock import SherlockEngine
 from PyQt6.QtCore import (
@@ -37,12 +39,14 @@ from core.config import (
     save_user_settings, ThemeManager 
 )
 from core.john_engine import JohnEngine
+from core.hydra_engine import HydraWorker
 from core.logger_engine import KeyloggerEngine
 
 # --- 1. CLASSE WORKER (Para não congelar a UI durante o Nmap) ---
 class ScannerWorker(QThread):
     finished = pyqtSignal(list)
     error = pyqtSignal(str)
+    progress = pyqtSignal(str)
 
     def __init__(self, ip_targets: list):
         super().__init__()
@@ -50,18 +54,26 @@ class ScannerWorker(QThread):
 
     def run(self):
         try:
-            results = network_scanner.scan_network_target(self.ip_targets)
+            results = []
+            total = len(self.ip_targets)
+
+            for i, ip in enumerate(self.ip_targets, start=1):
+                self.progress.emit(f"🔍 Escaneando {ip} ({i}/{total})")
+                result = network_scanner.scan_single_target(ip)
+                results.append(result)
+
             self.finished.emit(results)
+
         except Exception as e:
             self.error.emit(str(e))
-
 
 # --- 2. CLASSE DA PÁGINA DE SCANNER ---
 class ScannerPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
         self.parent_window = parent_window
-        self.last_results = None 
+        self.last_results = None
+        self.vulnerable_targets = []
         self._setup_ui()
 
     def _setup_ui(self):
@@ -71,28 +83,37 @@ class ScannerPage(QWidget):
         ip_group = QGroupBox("Alvos de Varredura (IPs/Ranges)")
         ip_group.setObjectName("targets_group")
         ip_layout = QVBoxLayout()
+
         self.ip_input = QLineEdit()
-        self.ip_input.setPlaceholderText("Ex: 192.168.1.1, 10.0.0.0/24, 172.16.1.1-10 (separados por vírgula ou espaço)")
+        self.ip_input.setPlaceholderText(
+            "Ex: 192.168.1.1, 10.0.0.0/24, 172.16.1.1-10"
+        )
         ip_layout.addWidget(self.ip_input)
-        
-        self.start_button = QPushButton("Iniciar Varredura Nmap")
+
+        self.start_button = QPushButton("Iniciar Varredura")
         self.start_button.clicked.connect(self.start_scan)
         ip_layout.addWidget(self.start_button)
-        
+
         ip_group.setLayout(ip_layout)
         layout.addWidget(ip_group)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
+
         result_group = QGroupBox("Resultados")
         result_group.setObjectName("results_group")
         result_layout = QVBoxLayout()
-        
+
         self.results_text = QLabel("Aguardando varredura...")
         self.results_text.setWordWrap(True)
-        self.results_text.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.MinimumExpanding)
-        self.results_text.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        
+        self.results_text.setAlignment(
+            Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft
+        )
+        self.results_text.setSizePolicy(
+            QSizePolicy.Policy.Preferred,
+            QSizePolicy.Policy.MinimumExpanding
+        )
+
         result_layout.addWidget(self.results_text)
         result_group.setLayout(result_layout)
         scroll_area.setWidget(result_group)
@@ -103,22 +124,13 @@ class ScannerPage(QWidget):
         self.save_button.clicked.connect(self.save_results)
         layout.addWidget(self.save_button)
 
+        self.send_hydra_button = QPushButton("Enviar IPs Vulneráveis para Hydra")
+        self.send_hydra_button.setEnabled(False)
+        self.send_hydra_button.clicked.connect(self.send_vulnerable_targets_to_hydra)
+        layout.addWidget(self.send_hydra_button)
+
         layout.addStretch()
         self.setLayout(layout)
-
-    def update_ui_language(self, L):
-        self.start_button.setText(lang_get(L, "scanner_page.start_scan", "Iniciar Varredura Nmap"))
-        self.save_button.setText(lang_get(L, "scanner_page.save_results", "Salvar Resultados no Logs/Relatórios"))
-        self.ip_input.setPlaceholderText(lang_get(L, "scanner_page.ip_placeholder", "Ex: 192.168.1.1, 10.0.0.0/24, etc."))
-        
-        self.findChild(QGroupBox, "targets_group").setTitle(
-            lang_get(L, "scanner_page.targets_group", "Alvos de Varredura (IPs/Ranges)")
-        )
-        self.findChild(QGroupBox, "results_group").setTitle(
-            lang_get(L, "scanner_page.results_group", "Resultados")
-        )
-        if self.last_results is None or self.results_text.text().startswith("Iniciando"):
-            self.results_text.setText(lang_get(L, "scanner_page.awaiting_scan", "Aguardando varredura..."))
 
     def start_scan(self):
         ips_raw = self.ip_input.text()
@@ -126,7 +138,7 @@ class ScannerPage(QWidget):
             self.results_text.setText("Por favor, insira pelo menos um IP ou range.")
             return
 
-        ip_list = re.split(r'[,\s]+', ips_raw) 
+        ip_list = re.split(r"[,\s]+", ips_raw)
         ip_list = [ip.strip() for ip in ip_list if ip.strip()]
 
         if not ip_list:
@@ -135,82 +147,142 @@ class ScannerPage(QWidget):
 
         self.start_button.setEnabled(False)
         self.save_button.setEnabled(False)
-        self.results_text.setText(f"Iniciando varredura em {len(ip_list)} alvos... (Pode demorar)")
+
+        self.results_text.setText(
+            f"Iniciando varredura em {len(ip_list)} alvo(s)...<br>"
+            f"<i>Isso pode demorar alguns minutos.</i>"
+        )
         self.parent_window.status_label.setText("Varrendo rede...")
 
         self.worker = ScannerWorker(ip_list)
         self.worker.finished.connect(self.scan_finished)
+        self.worker.progress.connect(self.update_progress)
         self.worker.error.connect(self.scan_error)
         self.worker.start()
 
+    def update_progress(self, message):
+        self.parent_window.status_label.setText(message)
+
     def scan_finished(self, results: list):
         self.last_results = results
+        self.vulnerable_targets = []
         self.start_button.setEnabled(True)
         self.save_button.setEnabled(True)
-        self.parent_window.status_label.setText("Varredura concluída!")
-        
-        display_text = ""
+
+        self.parent_window.status_label.setText("Varredura concluída ✔")
+
+        display_text = "<b>✔ Varredura finalizada</b><br><br>"
+
         for host in results:
             if host.get("error"):
-                display_text += f"<b>--- ERRO em {host['ip']} ---</b><br>{host['error']}<br><br>"
+                display_text += (
+                    f"<b>--- ERRO em {host.get('ip', 'N/A')} ---</b><br>"
+                    f"{host['error']}<br><br>"
+                )
                 continue
 
             display_text += f"<b>--- IP: {host.get('ip', 'N/A')} ---</b><br>"
-            display_text += f"<b>OS:</b> {host.get('os', 'Desconhecido')}<br>"
-            
-            ports = host.get('open_ports', [])
+
+            os_name = host.get("os", "Unknown")
+            if os_name == "Unknown":
+                display_text += "<b>OS:</b> Unknown (requer privilégios de root)<br>"
+            else:
+                display_text += f"<b>OS:</b> {os_name}<br>"
+
+            ports = host.get("open_ports", [])
             if ports:
                 display_text += "<i>Portas Abertas:</i><br>"
                 for p in ports:
-                    display_text += f"&nbsp; - <b>{p['port']}/{p['protocol']}</b>: {p['service']}<br>"
+                    display_text += (
+                        f"&nbsp; - <b>{p['port']}/{p['protocol']}</b>: "
+                        f"{p['service']}<br>"
+                    )
             else:
                 display_text += "Nenhuma porta aberta encontrada.<br>"
 
-            vulns = host.get('vulnerabilities', [])
+            vulns = host.get("vulnerabilities", [])
             if vulns:
+                self.vulnerable_targets.append(host.get('ip', '').strip())
                 display_text += "<i>Vulnerabilidades Potenciais:</i><br>"
                 for i, v in enumerate(vulns):
-                    v_short = v.replace('\n', ' ').strip()
-                    display_text += f"&nbsp; - <b>VULN {i+1}</b>: {v_short[:100]}...<br>"
-            
+                    if isinstance(v, dict):
+                        details = str(v.get("details", ""))
+                        port = v.get("port", "?")
+                        script = v.get("script", "unknown")
+                        v_short = details.replace("\n", " ").strip()
+                        display_text += (
+                            f"&nbsp; - <b>VULN {i+1}</b> "
+                            f"(Port {port}, {script}): "
+                            f"{v_short[:120]}...<br>"
+                        )
+                    else:
+                        v_short = str(v).replace("\n", " ").strip()
+                        display_text += (
+                            f"&nbsp; - <b>VULN {i+1}</b>: "
+                            f"{v_short[:120]}...<br>"
+                        )
+
             display_text += "<br>"
-        
+
         self.results_text.setText(display_text)
+        self.send_hydra_button.setEnabled(bool(self.vulnerable_targets))
 
     def scan_error(self, message):
         self.start_button.setEnabled(True)
-        self.parent_window.status_label.setText("ERRO durante varredura!")
-        self.results_text.setText(f"Um erro inesperado ocorreu: {message}. Verifique se o Nmap está instalado e se você tem permissões de sudo.")
+        self.parent_window.status_label.setText("Erro durante varredura ❌")
+        self.results_text.setText(
+            f"Um erro inesperado ocorreu:<br><b>{message}</b><br>"
+            "Verifique se o Nmap está instalado e se você tem permissões de sudo."
+        )
         self.last_results = None
+        self.send_hydra_button.setEnabled(False)
 
     def save_results(self):
-        if self.last_results:
-            log_dir = os.path.join(self.parent_window.base_dir, "logs")
-            os.makedirs(log_dir, exist_ok=True)
-            
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            filename = os.path.join(log_dir, f"scan_report_{timestamp}.json")
-            
-            try:
-                network_scanner.save_json(self.last_results, filename)
-                self.parent_window.status_label.setText(f"Relatório salvo em logs/{os.path.basename(filename)}")
-                self.save_button.setEnabled(False)
-            except Exception as e:
-                self.parent_window.status_label.setText(f"Falha ao salvar relatório: {e}")
+        if not self.last_results:
+            return
+
+        log_dir = os.path.join(self.parent_window.base_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = os.path.join(log_dir, f"scan_report_{timestamp}.json")
+
+        try:
+            network_scanner.save_json(self.last_results, filename)
+
+            self.parent_window.status_label.setText(
+                f"Relatório salvo em logs/{os.path.basename(filename)} ✔"
+            )
+            self.save_button.setEnabled(False)
+
+        except Exception as e:
+            self.parent_window.status_label.setText(
+                f"Falha ao salvar relatório: {type(e).__name__}"
+            )
+            print("ERRO AO SALVAR RELATÓRIO:", e)
+
+    def send_vulnerable_targets_to_hydra(self):
+        targets = [ip for ip in self.vulnerable_targets if ip]
+        if not targets:
+            QMessageBox.information(self, "Hydra", "Nenhum IP com vulnerabilidade disponível para enviar.")
+            return
+        self.parent_window.open_hydra_with_targets(targets)
+
 
 # --- CLASSE WORKER PARA O SHERLOCK ---
 class SherlockWorker(QThread):
     result_found = pyqtSignal(str, str)
     finished = pyqtSignal(list)
 
-    def __init__(self, username):
+    def __init__(self, target, mode):
         super().__init__()
-        self.username = username
+        self.target = target
+        self.mode = mode
         self.engine = SherlockEngine()
 
     def run(self):
-        # MUDANÇA AQUI: Agora usamos a busca global "everywhere"
-        results = self.engine.search_everywhere(self.username, self.result_found.emit)
+        # Passa o alvo e o modo para o motor
+        results = self.engine.search_everywhere(self.target, mode=self.mode, callback=self.result_found.emit)
         self.finished.emit(results)
 
 # --- CLASSE DA INTERFACE DO SHERLOCK ---
@@ -224,41 +296,63 @@ class SherlockPage(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(30, 30, 30, 30)
 
-        title = QLabel("🔍 Sherlock OSINT")
+        # Título e Subtítulo
+        title = QLabel("🔍 Sherlock OSINT Pro")
         title.setFont(QFont("Arial", 22, QFont.Weight.Bold))
         layout.addWidget(title)
 
-        # Container do Input
+        subtitle = QLabel("Busca avançada por Nickname, Nome Completo e Vazamentos.")
+        subtitle.setStyleSheet("color: #888; margin-bottom: 10px;")
+        layout.addWidget(subtitle)
+
+        # --- SELETOR DE MODO ---
+        mode_container = QHBoxLayout()
+        mode_label = QLabel("Tipo de Alvo:")
+        mode_label.setStyleSheet("color: white; font-weight: bold;")
+        
+        self.mode_selector = QComboBox()
+        self.mode_selector.addItems(["Nickname", "Nome Completo"])
+        self.mode_selector.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.mode_selector.setStyleSheet("""
+            QComboBox {
+                background: #1a1a1a; 
+                color: #0f0; 
+                border: 1px solid #0f0; 
+                padding: 5px 15px; 
+                border-radius: 5px;
+                min-width: 150px;
+            }
+            QComboBox QAbstractItemView {
+                background-color: #1a1a1a;
+                color: #0f0;
+                selection-background-color: #0f0;
+                selection-color: #000;
+            }
+        """)
+        mode_container.addWidget(mode_label)
+        mode_container.addWidget(self.mode_selector)
+        mode_container.addStretch() # Empurra tudo para a esquerda
+        layout.addLayout(mode_container)
+
+        # --- CONTAINER DE BUSCA ---
         search_box = QFrame()
-        search_box.setStyleSheet("background: #1a1a1a; border-radius: 10px; padding: 5px;")
+        search_box.setStyleSheet("background: #1a1a1a; border-radius: 10px; padding: 5px; border: 1px solid #333;")
         search_layout = QHBoxLayout(search_box)
 
         self.user_input = QLineEdit()
-        self.user_input.setPlaceholderText("Digite o username alvo...")
+        self.user_input.setPlaceholderText("Digite o alvo aqui...")
         self.user_input.setStyleSheet("border: none; background: transparent; padding: 10px; font-size: 16px; color: white;")
         
-        # BOTÃO ESTILIZADO
         self.btn_investigate = QPushButton("INVESTIGAR")
         self.btn_investigate.setCursor(Qt.CursorShape.PointingHandCursor)
         neon = self.parent_window.theme_manager.neon_color
         self.btn_investigate.setStyleSheet(f"""
             QPushButton {{
-                background-color: transparent;
-                border: 2px solid {neon};
-                color: {neon};
-                padding: 10px 25px;
-                border-radius: 5px;
-                font-weight: bold;
-                letter-spacing: 1px;
+                background-color: transparent; border: 2px solid {neon};
+                color: {neon}; padding: 10px 25px; border-radius: 5px; font-weight: bold;
             }}
-            QPushButton:hover {{
-                background-color: {neon};
-                color: #000;
-            }}
-            QPushButton:disabled {{
-                border-color: #555;
-                color: #555;
-            }}
+            QPushButton:hover {{ background-color: {neon}; color: #000; }}
+            QPushButton:disabled {{ border-color: #555; color: #555; }}
         """)
         self.btn_investigate.clicked.connect(self.run_sherlock)
 
@@ -266,9 +360,10 @@ class SherlockPage(QWidget):
         search_layout.addWidget(self.btn_investigate)
         layout.addWidget(search_box)
 
+        # --- ÁREA DE RESULTADOS ---
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
-        self.scroll.setStyleSheet("border: none; background: transparent;")
+        self.scroll.setStyleSheet("border: none; background: transparent; margin-top: 10px;")
         self.results_container = QWidget()
         self.results_layout = QVBoxLayout(self.results_container)
         self.results_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
@@ -276,17 +371,26 @@ class SherlockPage(QWidget):
         layout.addWidget(self.scroll)
 
     def run_sherlock(self):
-        username = self.user_input.text().strip()
-        if not username: return
+        target = self.user_input.text().strip()
+        if not target: return
 
+        # Traduz o que está no combo box para o que o motor entende
+        # 0 é Nickname, 1 é Nome Completo
+        mode = "nickname" if self.mode_selector.currentIndex() == 0 else "full_name"
+
+        # Limpa resultados anteriores
         for i in reversed(range(self.results_layout.count())): 
-            self.results_layout.itemAt(i).widget().setParent(None)
+            widget = self.results_layout.itemAt(i).widget()
+            if widget:
+                widget.setParent(None)
 
         self.btn_investigate.setEnabled(False)
-        self.thread = SherlockWorker(username)
+        self.btn_investigate.setText("BUSCANDO...")
+        
+        # CHAMA A THREAD (Aqui estava o erro: agora passamos target e mode)
+        self.thread = SherlockWorker(target, mode)
         self.thread.result_found.connect(self.add_result_card)
-        # Conecta o término ao salvamento
-        self.thread.finished.connect(lambda res: self.finalize_search(username, res))
+        self.thread.finished.connect(lambda res: self.finalize_search(target, res))
         self.thread.start()
 
     def finalize_search(self, username, results):
@@ -325,34 +429,389 @@ class SherlockPage(QWidget):
 
     def add_result_card(self, site, url):
         card = QFrame()
-        # Se for DuckDuckGo, vamos colocar uma cor de borda diferente (ex: Laranja)
-        border_color = "#ff8c00" if site == "DuckDuckGo" else self.parent_window.theme_manager.neon_color
+        
+        # Mapeamento de cores OSINT
+        # Isso ajuda o auditor a identificar vazamentos e documentos rapidamente
+        color_map = {
+            "DuckDuckGo": "#ff8c00",       # Laranja para busca global
+            "OSINT-Search": "#ff8c00",
+            "Webmii": "#00ced1",           # Azul claro para people search
+            "PeekYou": "#00ced1",
+            "TruePeople": "#00ced1",
+            "📄 Documento": "#ff4444",     # Vermelho para possíveis vazamentos/PDFs
+            "Potential Leak/Doc": "#ff4444",
+            "Gravatar": "#da70d6"          # Roxo para perfis com fotos/identidade
+        }
+        
+        # Se o site não estiver no mapa, usa a cor neon padrão do sistema
+        neon = self.parent_window.theme_manager.neon_color
+        border_color = color_map.get(site, neon)
         
         card.setStyleSheet(f"""
             QFrame {{
                 background: #222; 
-                border-left: 4px solid {border_color}; 
+                border-left: 5px solid {border_color}; 
                 border-radius: 5px; 
-                margin-bottom: 5px;
+                margin-bottom: 8px;
+                padding: 10px;
+            }}
+            QFrame:hover {{
+                background: #2a2a2a;
             }}
         """)
         
         l = QHBoxLayout(card)
-        # Limita o tamanho da URL para não quebrar o layout
-        display_url = (url[:60] + '...') if len(url) > 60 else url
         
-        label_text = f"<b>{site}</b><br><span style='color: #aaa;'>{display_url}</span>"
-        l.addWidget(QLabel(label_text))
+        # Formatação do texto
+        display_url = (url[:65] + '...') if len(url) > 65 else url
+        label_text = f"""
+            <div style='color: white;'>
+                <b style='font-size: 14px;'>{site}</b><br>
+                <span style='color: #888; font-size: 12px;'>{display_url}</span>
+            </div>
+        """
+        
+        info_label = QLabel(label_text)
+        l.addWidget(info_label)
         
         l.addStretch()
-        btn = QPushButton("Abrir")
-        btn.setFixedWidth(80)
+        
+        # Botão Abrir
+        btn = QPushButton("VISUALIZAR")
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFixedWidth(100)
+        btn.setStyleSheet(f"""
+            QPushButton {{
+                background: #333; color: white; border-radius: 3px; padding: 5px; font-size: 11px;
+            }}
+            QPushButton:hover {{ background: #444; color: {border_color}; }}
+        """)
         btn.clicked.connect(lambda: webbrowser.open(url))
         l.addWidget(btn)
         
-        self.results_layout.addWidget(card)
+        self.results_layout.insertWidget(0, card) # Adiciona os novos no topo
+
+# --- Hydra ---
+class HydraPage(QWidget):
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.user_list_path = ""
+        self.pass_list_path = ""
+        self.targets_file = None
+        self.worker = None
+
+        scroll = QScrollArea(self)
+        scroll.setWidgetResizable(True)
+
+        container = QWidget()
+        self.main_layout = QVBoxLayout(container)
+
+        scroll.setWidget(container)
+
+        outer_layout = QVBoxLayout(self)
+        outer_layout.addWidget(scroll)
+
+        self._setup_ui()
+
+    # ===============================
+    # UI
+    # ===============================
+    def _setup_ui(self):
+        layout = self.main_layout
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(15)
+
+        title = QLabel("🧰 Hydra - Teste de Credenciais")
+        title.setFont(QFont("Arial", 22, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        warning = QLabel("⚠️ Use somente em ambientes autorizados.")
+        warning.setStyleSheet("color: #ffaa00; font-weight: bold;")
+        layout.addWidget(warning)
+
+        # -------- Targets --------
+        targets_group = QGroupBox("Alvos")
+        targets_layout = QVBoxLayout()
+        self.targets_input = QTextEdit()
+        self.targets_input.setPlaceholderText("Ex: 192.168.0.10\n192.168.0.20")
+        self.targets_input.setFixedHeight(80)
+        targets_layout.addWidget(self.targets_input)
+        targets_group.setLayout(targets_layout)
+        layout.addWidget(targets_group)
+
+        # -------- Service --------
+        service_group = QGroupBox("Serviço e Porta")
+        service_layout = QHBoxLayout()
+
+        self.service_combo = QComboBox()
+        self.service_combo.setEditable(True)
+        self.service_combo.addItems([
+            "ssh", "ftp", "telnet", "smb", "rdp",
+            "http-get", "http-post-form",
+            "mysql", "postgres", "vnc"
+        ])
+        self.service_combo.currentTextChanged.connect(self._on_service_changed)
+
+        self.port_input = QSpinBox()
+        self.port_input.setRange(0, 65535)
+        self.port_input.setValue(0)
+
+        service_layout.addWidget(QLabel("Serviço:"))
+        service_layout.addWidget(self.service_combo, 2)
+        service_layout.addWidget(QLabel("Porta:"))
+        service_layout.addWidget(self.port_input, 1)
+
+        service_group.setLayout(service_layout)
+        layout.addWidget(service_group)
+
+        # -------- HTTP POST FORM --------
+        self.http_group = QGroupBox("Configuração HTTP POST")
+        self.http_group.setVisible(False)
+
+        http_layout = QVBoxLayout()
+
+        self.http_path = QLineEdit()
+        self.http_path.setPlaceholderText("/login.php")
+
+        self.http_params = QLineEdit()
+        self.http_params.setPlaceholderText("username=^USER^&password=^PASS^")
+
+        self.http_fail = QLineEdit()
+        self.http_fail.setPlaceholderText("Texto de falha (ex: Invalid login)")
+
+        http_layout.addWidget(QLabel("Caminho do formulário"))
+        http_layout.addWidget(self.http_path)
+        http_layout.addWidget(QLabel("Parâmetros POST"))
+        http_layout.addWidget(self.http_params)
+        http_layout.addWidget(QLabel("String de falha"))
+        http_layout.addWidget(self.http_fail)
+
+        self.http_group.setLayout(http_layout)
+        layout.addWidget(self.http_group)
+
+        # -------- Credentials --------
+        creds_group = QGroupBox("Credenciais")
+        creds_layout = QVBoxLayout()
+
+        user_row = QHBoxLayout()
+        self.user_input = QLineEdit()
+        self.user_input.setPlaceholderText("Usuário único")
+        self.user_list_button = QPushButton("Lista de Usuários")
+        self.user_list_button.clicked.connect(self.select_user_list)
+        user_row.addWidget(self.user_input, 2)
+        user_row.addWidget(self.user_list_button, 1)
+
+        pass_row = QHBoxLayout()
+        self.pass_input = QLineEdit()
+        self.pass_input.setPlaceholderText("Senha única")
+        self.pass_list_button = QPushButton("Lista de Senhas")
+        self.pass_list_button.clicked.connect(self.select_pass_list)
+        pass_row.addWidget(self.pass_input, 2)
+        pass_row.addWidget(self.pass_list_button, 1)
+
+        creds_layout.addLayout(user_row)
+        creds_layout.addLayout(pass_row)
+        creds_group.setLayout(creds_layout)
+        layout.addWidget(creds_group)
+
+        # -------- Options --------
+        options_group = QGroupBox("Opções")
+        options_layout = QHBoxLayout()
+
+        self.tasks_input = QSpinBox()
+        self.tasks_input.setRange(1, 64)
+        self.tasks_input.setValue(4)
+
+        self.stop_on_success = QCheckBox("Parar ao encontrar credencial")
+        self.verbose_check = QCheckBox("Verbose")
+
+        options_layout.addWidget(QLabel("Threads (-t):"))
+        options_layout.addWidget(self.tasks_input)
+        options_layout.addWidget(self.stop_on_success)
+        options_layout.addWidget(self.verbose_check)
+
+        options_group.setLayout(options_layout)
+        layout.addWidget(options_group)
+
+        # -------- Buttons --------
+        button_row = QHBoxLayout()
+
+        self.start_button = QPushButton("INICIAR")
+        self.start_button.clicked.connect(self.start_hydra)
+
+        self.stop_button = QPushButton("PARAR")
+        self.stop_button.setEnabled(False)
+        self.stop_button.clicked.connect(self.stop_hydra)
+
+        button_row.addWidget(self.start_button)
+        button_row.addWidget(self.stop_button)
+        layout.addLayout(button_row)
+
+        # -------- Console --------
+        self.console = QTextEdit()
+        self.console.setReadOnly(True)
+        self.console.setStyleSheet(
+            "background:#000;color:#0f0;font-family:Courier New;"
+        )
+        layout.addWidget(self.console)
+
+    # ===============================
+    # Helpers
+    # ===============================
+    def _on_service_changed(self, service):
+        self.http_group.setVisible(service.strip() == "http-post-form")
+
+    def _parse_targets(self):
+        raw = self.targets_input.toPlainText()
+        return [t.strip() for t in re.split(r"[,\s]+", raw) if t.strip()]
+
+    def _write_targets_file(self, targets):
+        tmp = tempfile.NamedTemporaryFile(
+            delete=False, mode="w", encoding="utf-8", suffix=".txt"
+        )
+        tmp.write("\n".join(targets))
+        tmp.close()
+        return tmp.name
+
+    def select_user_list(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Lista de Usuários", "", "*.txt")
+        if file:
+            self.user_list_path = file
+            self.user_list_button.setText(os.path.basename(file))
+
+    def select_pass_list(self):
+        file, _ = QFileDialog.getOpenFileName(self, "Lista de Senhas", "", "*.txt")
+        if file:
+            self.pass_list_path = file
+            self.pass_list_button.setText(os.path.basename(file))
+
+    # ===============================
+    # Hydra
+    # ===============================
+    def start_hydra(self):
+        self.hydra_start_time = datetime.now()
+        if self.worker:
+            QMessageBox.information(self, "Hydra", "Já existe uma execução em andamento.")
+            return
+
+        targets = self._parse_targets()
+        if not targets:
+            QMessageBox.warning(self, "Hydra", "Informe ao menos um alvo.")
+            return
+
+        service = self.service_combo.currentText().strip()
+        if not service:
+            QMessageBox.warning(self, "Hydra", "Informe o serviço.")
+            return
+
+        if service == "http-post-form":
+            if not all([
+                self.http_path.text().strip(),
+                self.http_params.text().strip(),
+                self.http_fail.text().strip()
+            ]):
+                QMessageBox.warning(self, "Hydra", "Preencha todos os campos do HTTP POST.")
+                return
+            if "^USER^" not in self.http_params.text() and "^PASS^" not in self.http_params.text():
+                QMessageBox.warning(self, "Hydra", "Use ^USER^ e ^PASS^ nos parâmetros.")
+                return
+
+        self.targets_file = None
+        if len(targets) > 1:
+            self.targets_file = self._write_targets_file(targets)
+
+        self.console.clear()
+        self.start_button.setEnabled(False)
+        self.stop_button.setEnabled(True)
+
+        self.worker = HydraWorker(
+            targets=targets,
+            service=service,
+            username=self.user_input.text().strip(),
+            password=self.pass_input.text().strip(),
+            user_list=self.user_list_path,
+            pass_list=self.pass_list_path,
+            port=self.port_input.value(),
+            tasks=self.tasks_input.value(),
+            stop_on_success=self.stop_on_success.isChecked(),
+            verbose=self.verbose_check.isChecked(),
+            targets_file=self.targets_file,
+            http_path=self.http_path.text().strip(),
+            http_params=self.http_params.text().strip(),
+            http_fail=self.http_fail.text().strip(),
+        )
+
+        self.current_targets = targets
+        self.current_service = service
+        self.current_port = self.port_input.value()
+        self.current_attack_type = "single" if self.user_input.text() and self.pass_input.text() else "wordlist"
+        self.worker.output_line.connect(self.console.append)
+        self.worker.error.connect(self.console.append)
+        self.worker.finished.connect(self.finish_hydra)
+        self.worker.finished.connect(self.worker.deleteLater)
+
+        self.worker.start()
+
+    def stop_hydra(self):
+        if self.worker:
+            self.worker.stop()
+            self.console.append("[INFO] Interrupção solicitada.")
+        self.stop_button.setEnabled(False)
+
+    def finish_hydra(self, code):
+        success = (code == 0)
+
+        self.console.append(f"[INFO] Hydra finalizado com código {code}.")
+
+        found_creds = None
+        if success:
+            found_creds = {
+                "username": self.user_input.text().strip(),
+                "password": self.pass_input.text().strip(),
+            }
+
+        self._save_hydra_log(success, found_creds)
+
+        self.start_button.setEnabled(True)
+        self.stop_button.setEnabled(False)
+        self.worker = None
 
 
+    def _save_hydra_log(self, success, found_creds=None):
+        log_dir = os.path.join(self.parent_window.base_dir, "logs")
+        os.makedirs(log_dir, exist_ok=True)
+
+        duration = None
+        if hasattr(self, "hydra_start_time"):
+            duration = (datetime.now() - self.hydra_start_time).total_seconds()
+
+        now = datetime.now()
+        filename = f"hydra_{now.strftime('%Y-%m-%d_%H-%M-%S')}.json"
+        filepath = os.path.join(log_dir, filename)
+
+        log_data = {
+            "attack_id": str(uuid.uuid4()),
+            "tool": "Hydra",
+            "timestamp": now.isoformat(),
+            "duration_seconds": duration,
+            "targets": getattr(self, "current_targets", []),
+            "service": getattr(self, "current_service", ""),
+            "port": getattr(self, "current_port", 0),
+            "attack_type": getattr(self, "current_attack_type", "unknown"),
+            "severity": "HIGH" if success else "INFO",
+            "success": success,
+            "credentials_found": found_creds if success else None,
+            "evidence": "Valid credentials found" if success else "No credentials found"
+        }
+
+        with open(filepath, "w", encoding="utf-8") as f:
+            json.dump(log_data, f, indent=4, ensure_ascii=False)
+
+        self.console.append(f"[INFO] Log salvo em {filepath}")
+
+
+# --- BRUTE FORCE ---
 class FirewallPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
@@ -447,8 +906,7 @@ class FirewallPage(QWidget):
     def update_ui_language(self, L):
         self.L = L
 
-# --- PAGINA DO AGENTE (Ta dificil para um karalho de resolver isso) ---
-
+# --- PAGINA DO AGENTE ---
 class PayloadPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
@@ -555,8 +1013,8 @@ class PayloadPage(QWidget):
         except Exception as e:
             self.status_log.setText(f"<b>[ERRO]</b>: {str(e)}")
 
-# --- PAGINA DE CONTROLE ---
 
+# --- PAGINA DE CONTROLE ---
 class ListenerPage(QWidget):
     def __init__(self, parent_window):
         super().__init__()
@@ -625,6 +1083,7 @@ class ListenerPage(QWidget):
             except Exception as e:
                 self.status_conn.setText("Status: Conexão Perdida.")
                 self.cmd_input.setEnabled(False)
+
 
 # --- JOHN THE RIPPER ---
 class JohnWorker(QThread):
@@ -922,21 +1381,6 @@ class KeyloggerPage(QWidget):
         # Comando para abrir pasta no Linux
         os.system(f"xdg-open {log_dir}")
 
-# --- SHERLOCK ---
-class SherlockWorker(QThread):
-    result_found = pyqtSignal(str, str)
-    finished = pyqtSignal(list) # Agora envia a lista completa ao fim
-
-    def __init__(self, username):
-        super().__init__()
-        self.username = username
-        self.engine = SherlockEngine()
-
-    def run(self):
-        # A search_user agora retorna a lista de dicionários
-        results = self.engine.search_user(self.username, self.result_found.emit)
-        self.finished.emit(results)
-
 # --- DDOS ---
 class StressTestPage(QWidget):
     def __init__(self, parent_window):
@@ -1048,6 +1492,10 @@ class MainWindow(QMainWindow):
         self.pages.setCurrentIndex(index)
         self.status_label.setText(f"Status: Página {index} carregada")
 
+    def open_hydra_with_targets(self, targets):
+        self.hydra_page.set_targets(targets)
+        self.safe_change_page(13)
+
     def __init__(self, base_dir):
         super().__init__()
         self.base_dir = base_dir
@@ -1074,6 +1522,7 @@ class MainWindow(QMainWindow):
         self.card_osint.update()
         self.card_john.update()
         self.card_keylogger.update()
+        self.card_hydra.update()
         
         # Aplicação de Tema e Idioma (Funções que você já deve ter)
         self._apply_theme(self.theme_manager.current_theme) 
@@ -1164,6 +1613,9 @@ class MainWindow(QMainWindow):
         self.card_keylogger = NeonCard("⌨️", "Key Auditor", "Log de teclado.", self.theme_manager.neon_color, self.theme_manager)
         self.card_keylogger.on_card_activated = lambda: self.safe_change_page(12)
 
+        self.card_hydra = NeonCard("🧰", "Hydra", "Teste credenciais.", self.theme_manager.neon_color, self.theme_manager)
+        self.card_hydra.on_card_activated = lambda: self.safe_change_page(13)
+
         # Adicionando ao Grid (Linha, Coluna)
         card_grid.addWidget(self.card_scanner, 0, 0)
         card_grid.addWidget(self.card_stress, 0, 1)
@@ -1171,6 +1623,7 @@ class MainWindow(QMainWindow):
         card_grid.addWidget(self.card_osint, 1, 0)
         card_grid.addWidget(self.card_john, 1, 1)
         card_grid.addWidget(self.card_keylogger, 1, 2)
+        card_grid.addWidget(self.card_hydra, 2, 0)
 
         home_layout.addLayout(card_grid)
         home_layout.addStretch()
@@ -1208,6 +1661,9 @@ class MainWindow(QMainWindow):
 
         self.key_auditor_page = KeyloggerPage(self)
         self.pages.insertWidget(12, self.key_auditor_page) # Index 12
+
+        self.hydra_page = HydraPage(self)
+        self.pages.insertWidget(13, self.hydra_page) # Index 13
 
         # Finalização
         content_v_layout.addWidget(self.pages)

@@ -7,14 +7,32 @@ from datetime import datetime
 from multiprocessing import Pool, cpu_count, Manager
 import itertools
 import string
+import warnings
 
 # ==========================================================
-# ⚙️ Worker multiprocessing
+# 🔕 Silencia avisos chatos do passlib
+# ==========================================================
+warnings.filterwarnings("ignore", category=UserWarning)
+
+# ==========================================================
+# 🔐 BCRYPT (opcional)
+# ==========================================================
+try:
+    from passlib.hash import bcrypt
+    HAS_BCRYPT = True
+except ImportError:
+    HAS_BCRYPT = False
+
+# ==========================================================
+# ⚙️ Worker multiprocessing (FORA da classe)
 # ==========================================================
 def worker(args):
     word, target_hash, algorithm, salt, use_rules, stop_event = args
 
-    # 🔒 Sanitização obrigatória
+    if stop_event.is_set():
+        return None
+
+    # 🧼 Sanitização forte
     word = (
         word.replace("\ufeff", "")
             .replace("\r", "")
@@ -22,9 +40,26 @@ def worker(args):
             .strip()
     )
 
-    if not word or stop_event.is_set():
+    if not word:
         return None
 
+    # =======================
+    # 🔐 BCRYPT
+    # =======================
+    if algorithm == "BCRYPT":
+        if not HAS_BCRYPT:
+            return None
+        try:
+            if bcrypt.verify(word, target_hash):
+                stop_event.set()
+                return word
+        except Exception:
+            return None
+        return None
+
+    # =======================
+    # 🔑 HASHLIB
+    # =======================
     algo_map = {
         "MD5": hashlib.md5,
         "SHA1": hashlib.sha1,
@@ -48,34 +83,25 @@ def worker(args):
             "!" + word
         }
 
-    modes = ("suffix", "prefix") if salt else ("suffix",)
-
     for variant in variants:
-        for mode in modes:
-            if stop_event.is_set():
-                return None
+        if stop_event.is_set():
+            return None
 
-            if salt:
-                test = salt + variant if mode == "prefix" else variant + salt
-            else:
-                test = variant
+        test = variant + salt if salt else variant
+        digest = algo_func(test.encode()).hexdigest().lower()
 
-            if algo_func(test.encode()).hexdigest().lower() == target_hash:
-                stop_event.set()
-                return variant
+        if digest == target_hash:
+            stop_event.set()
+            return variant
 
     return None
 
 
+# ==========================================================
+# 🧠 JohnEngine
+# ==========================================================
 class JohnEngine:
     def __init__(self):
-        self.algorithms = {
-            "MD5": hashlib.md5,
-            "SHA1": hashlib.sha1,
-            "SHA256": hashlib.sha256,
-            "SHA512": hashlib.sha512
-        }
-
         self.hash_length_map = {
             32: "MD5",
             40: "SHA1",
@@ -91,13 +117,18 @@ class JohnEngine:
         }
 
     # ==========================================================
-    # 🔍 Detecta algoritmo pelo tamanho do hash
+    # 🔍 Detecta algoritmo
     # ==========================================================
     def detect_algorithm(self, target_hash):
+        target_hash = target_hash.strip()
+
+        if target_hash.startswith(("$2a$", "$2b$", "$2y$")):
+            return "BCRYPT"
+
         return self.hash_length_map.get(len(target_hash))
 
     # ==========================================================
-    # 🔥 Crack usando wordlist
+    # 🔥 Crack Wordlist
     # ==========================================================
     def crack_wordlist(
         self,
@@ -116,15 +147,18 @@ class JohnEngine:
             if not algorithm:
                 return {"success": False, "error": "Algoritmo não identificado"}
 
+        try:
+            with open(wordlist_path, "r", encoding="utf-8", errors="ignore") as f:
+                words = f.readlines()
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
         processes = processes or cpu_count()
-        start = time.time()
         tested = 0
+        start = time.time()
 
         with Manager() as manager:
             stop_event = manager.Event()
-
-            with open(wordlist_path, "r", encoding="utf-8", errors="ignore") as f:
-                words = [line for line in f]
 
             args = [
                 (w, target_hash, algorithm, salt, use_rules, stop_event)
@@ -132,7 +166,9 @@ class JohnEngine:
             ]
 
             with Pool(processes) as pool:
-                for result in pool.imap_unordered(worker, args, chunksize=100):
+                chunksize = 1 if algorithm == "BCRYPT" else 100
+
+                for result in pool.imap_unordered(worker, args, chunksize):
                     tested += 1
 
                     if callback and tested % 100 == 0:
@@ -153,121 +189,45 @@ class JohnEngine:
         return {"success": False, "error": "Senha não encontrada"}
 
     # ==========================================================
-    # 🔥 Crack usando máscara
-    # ==========================================================
-    def crack_mask(
-        self,
-        target_hash,
-        mask,
-        algorithm=None,
-        salt=None,
-        callback=None,
-        processes=None
-    ):
-        target_hash = target_hash.strip().lower()
-
-        if not algorithm:
-            algorithm = self.detect_algorithm(target_hash)
-            if not algorithm:
-                return {"success": False, "error": "Algoritmo não identificado"}
-
-        processes = processes or cpu_count()
-        start = time.time()
-        tested = 0
-
-        candidates = list(self.expand_mask(mask))
-
-        with Manager() as manager:
-            stop_event = manager.Event()
-
-            args = [
-                (w, target_hash, algorithm, salt, False, stop_event)
-                for w in candidates
-            ]
-
-            with Pool(processes) as pool:
-                for result in pool.imap_unordered(worker, args, chunksize=500):
-                    tested += 1
-
-                    if callback and tested % 100 == 0:
-                        elapsed = time.time() - start
-                        speed = int(tested / elapsed) if elapsed > 0 else 0
-                        callback(tested, speed)
-
-                    if result:
-                        pool.terminate()
-                        return {
-                            "success": True,
-                            "password": result,
-                            "hash": target_hash,
-                            "algorithm": algorithm,
-                            "salt": salt
-                        }
-
-        return {"success": False, "error": "Senha não encontrada"}
-
-    # ==========================================================
-    # 🎭 Expansão de máscara (?l?l?d)
+    # 🎭 Expansão de máscara
     # ==========================================================
     def expand_mask(self, mask):
         pools = []
         i = 0
         while i < len(mask):
-            token = mask[i:i + 2]
+            token = mask[i:i+2]
             if token in self.mask_map:
                 pools.append(self.mask_map[token])
                 i += 2
             else:
                 pools.append(mask[i])
                 i += 1
-
         return ("".join(p) for p in itertools.product(*pools))
 
     # ==========================================================
-    # 📊 Benchmark real (H/s)
-    # ==========================================================
-    def benchmark(self, algorithm, duration=5):
-        algo_func = self.algorithms.get(algorithm)
-        if not algo_func:
-            return None
-
-        start = time.time()
-        count = 0
-
-        while time.time() - start < duration:
-            algo_func(b"benchmark").hexdigest()
-            count += 1
-
-        return int(count / duration)
-
-    # ==========================================================
-    # 💾 Salva o resultado em JSON
+    # 💾 Salvar resultado
     # ==========================================================
     def save_result(self, result, base_dir):
         log_dir = os.path.join(base_dir, "logs")
         os.makedirs(log_dir, exist_ok=True)
 
-        agora = datetime.now()
+        now = datetime.now()
 
-        report_data = {
-            "relatorio_tipo": "Quebra de Hash - Auditoria de Segurança",
-            "gerado_por": "AURA Advanced Unit",
-            "data_execucao": agora.strftime("%d/%m/%Y %H:%M:%S"),
+        data = {
             "status": "SUCESSO" if result.get("success") else "FALHA",
-            "detalhes": {
-                "hash_alvo": result.get("hash"),
-                "algoritmo": result.get("algorithm"),
-                "salt_utilizado": result.get("salt"),
-                "senha_descoberta": result.get("password") if result.get("success") else "N/A"
-            },
-            "timestamp_unix": time.time()
+            "hash": result.get("hash"),
+            "algoritmo": result.get("algorithm"),
+            "senha": result.get("password"),
+            "data": now.strftime("%d/%m/%Y %H:%M:%S")
         }
 
-        filename = f"john_crack_{agora.strftime('%Y%m%d_%H%M%S')}.json"
-        filepath = os.path.join(log_dir, filename)
+        path = os.path.join(
+            log_dir,
+            f"john_result_{now.strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
-        with open(filepath, "w", encoding="utf-8") as f:
-            json.dump(report_data, f, indent=4, ensure_ascii=False)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=4, ensure_ascii=False)
 
-        return filepath
+        return path
 
