@@ -80,8 +80,9 @@ class ScannerPage(QWidget):
         layout = QVBoxLayout()
         layout.setContentsMargins(20, 20, 20, 20)
 
-        ip_group = QGroupBox("Alvos de Varredura (IPs/Ranges)")
-        ip_group.setObjectName("targets_group")
+        self.ip_group = QGroupBox("Alvos de Varredura (IPs/Ranges)")
+        self.ip_group.setObjectName("targets_group")
+
         ip_layout = QVBoxLayout()
 
         self.ip_input = QLineEdit()
@@ -94,14 +95,14 @@ class ScannerPage(QWidget):
         self.start_button.clicked.connect(self.start_scan)
         ip_layout.addWidget(self.start_button)
 
-        ip_group.setLayout(ip_layout)
-        layout.addWidget(ip_group)
+        self.ip_group.setLayout(ip_layout)
+        layout.addWidget(self.ip_group)
 
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
 
-        result_group = QGroupBox("Resultados")
-        result_group.setObjectName("results_group")
+        self.result_group = QGroupBox("Resultados")
+        self.result_group.setObjectName("results_group")
         result_layout = QVBoxLayout()
 
         self.results_text = QLabel("Aguardando varredura...")
@@ -115,8 +116,8 @@ class ScannerPage(QWidget):
         )
 
         result_layout.addWidget(self.results_text)
-        result_group.setLayout(result_layout)
-        scroll_area.setWidget(result_group)
+        self.result_group.setLayout(result_layout)
+        scroll_area.setWidget(self.result_group)
         layout.addWidget(scroll_area)
 
         self.save_button = QPushButton("Salvar Resultados no Logs/Relatórios")
@@ -131,6 +132,19 @@ class ScannerPage(QWidget):
 
         layout.addStretch()
         self.setLayout(layout)
+
+    def update_ui_language(self, L):
+        self.ip_group.setTitle(lang_get(L, "scanner_page.targets_group", "Alvos de Varredura (IPs/Ranges)"))
+        self.ip_input.setPlaceholderText(
+            lang_get(L, "scanner_page.ip_placeholder", "Ex: 192.168.1.1, 10.0.0.0/24, etc.")
+        )
+        self.start_button.setText(lang_get(L, "scanner_page.start_scan", "Iniciar Varredura Nmap"))
+        self.result_group.setTitle(lang_get(L, "scanner_page.results_group", "Resultados"))
+        if self.results_text.text().strip() == "Aguardando varredura...":
+            self.results_text.setText(lang_get(L, "scanner_page.awaiting_scan", "Aguardando varredura..."))
+        self.save_button.setText(
+            lang_get(L, "scanner_page.save_results", "Salvar Resultados no Logs/Relatórios")
+        )
 
     def start_scan(self):
         ips_raw = self.ip_input.text()
@@ -1488,53 +1502,66 @@ class StressTestPage(QWidget):
 
 # --- CLASSE PRINCIPAL (MainWindow) ---
 class MainWindow(QMainWindow):
+    PAGE_HOME = 0
+    PAGE_TOOLS = 1
+    PAGE_SCANNER = 2
+    PAGE_SCRIPTS = 3
+    PAGE_LOGS = 4
+    PAGE_CONFIG = 5
+    PAGE_FIREWALL = 6
+    PAGE_PAYLOAD = 7
+    PAGE_LISTENER = 8
+    PAGE_STRESS = 9
+    PAGE_OSINT = 10
+    PAGE_JOHN = 11
+    PAGE_KEYLOGGER = 12
+    PAGE_HYDRA = 13
+
     def safe_change_page(self, index):
-        self.pages.setCurrentIndex(index)
-        self.status_label.setText(f"Status: Página {index} carregada")
+        if 0 <= index < self.pages.count():
+            self.pages.setCurrentIndex(index)
+            self.status_label.setText(f"Status: Página {index} carregada")
 
     def open_hydra_with_targets(self, targets):
         self.hydra_page.set_targets(targets)
-        self.safe_change_page(13)
+        self.safe_change_page(self.PAGE_HYDRA)
 
     def __init__(self, base_dir):
         super().__init__()
         self.base_dir = base_dir
-        
-        # Configurações e Idioma
+
         self.user_settings = load_user_settings(self.base_dir)
         self.theme_manager = ThemeManager(self.user_settings)
-        self.current_lang_code = self.user_settings.get('language', 'pt') 
+        self.current_lang_code = self.user_settings.get('language', 'pt')
         self.L = load_language_json(self.current_lang_code, self.base_dir)
-        
+
         self.setWindowTitle("AURA Security Toolkit")
         self.setGeometry(100, 100, 1200, 800)
-        
-        self._build_ui()
 
-        # No final do __init__ da MainWindow
+        self._build_ui()
+        self._apply_theme(self.theme_manager.current_theme)
+        self.update_ui_language(self.current_lang_code)
+
         self.show()
-        # Isso força o Qt a processar todos os eventos de pintura pendentes
-        QApplication.processEvents() 
-        # Dá um "tapinha" no estilo para limpar o cache visual
-        self.card_scanner.update()
-        self.card_stress.update()
-        self.card_firewall.update()
-        self.card_osint.update()
-        self.card_john.update()
-        self.card_keylogger.update()
-        self.card_hydra.update()
-        
-        # Aplicação de Tema e Idioma (Funções que você já deve ter)
-        self._apply_theme(self.theme_manager.current_theme) 
-        #self.update_ui_language(self.current_lang_code)
+        QApplication.processEvents()
+        self._refresh_neon_fix()
 
     def _refresh_neon_fix(self):
-        """Limpa o cache visual e remove o aspecto borrado dos cards."""
         neon_color = self.theme_manager.neon_color
-        # Busca todos os NeonCards e força o redesenho individual [cite: 95]
         for card in self.findChildren(NeonCard):
             card.set_neon_color(neon_color, self.theme_manager.current_theme)
             card.update()
+
+    def _build_placeholder_page(self, text):
+        page = QWidget()
+        layout = QVBoxLayout(page)
+        label = QLabel(text)
+        label.setWordWrap(True)
+        label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        layout.addStretch()
+        layout.addWidget(label)
+        layout.addStretch()
+        return page
 
     def _build_ui(self):
         central_widget = QWidget()
@@ -1543,80 +1570,82 @@ class MainWindow(QMainWindow):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # --- SIDEBAR ---
         self.sidebar = QFrame()
         self.sidebar.setFixedWidth(200)
         self.sidebar.setObjectName("Sidebar")
         sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(10, 20, 10, 10)
         sidebar_layout.setSpacing(10)
-        
+
         self.title_label = QLabel("AURA")
         self.title_label.setFont(QFont("Arial", 24, QFont.Weight.Bold))
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setObjectName("AuraTitle")
         sidebar_layout.addWidget(self.title_label)
-        
+
         self.btn_home = self._make_sidebar_button("Home", "🏠")
-        self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️") 
-        self.btn_scanner = self._make_sidebar_button("Scanner", "🛰️") 
-        self.btn_scripts = self._make_sidebar_button("Scripts", "📜") 
-        self.btn_logs = self._make_sidebar_button("Logs", "📁")    
+        self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️")
+        self.btn_scanner = self._make_sidebar_button("Scanner", "🛰️")
+        self.btn_scripts = self._make_sidebar_button("Scripts", "📜")
+        self.btn_logs = self._make_sidebar_button("Logs", "📁")
         self.btn_config = self._make_sidebar_button("Configurações", "⚙️")
-        
-        self.sidebar_buttons = [self.btn_home, self.btn_tools, self.btn_scanner, self.btn_scripts, self.btn_logs, self.btn_config]
+
+        self.sidebar_buttons = [
+            self.btn_home,
+            self.btn_tools,
+            self.btn_scanner,
+            self.btn_scripts,
+            self.btn_logs,
+            self.btn_config,
+        ]
         for btn in self.sidebar_buttons:
             sidebar_layout.addWidget(btn)
 
-        sidebar_layout.addItem(QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding))
+        sidebar_layout.addItem(
+            QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+        )
 
         self.status_label = QLabel("Status: Pronto")
         sidebar_layout.addWidget(self.status_label)
-        
         main_layout.addWidget(self.sidebar)
 
-        # --- ÁREA DE CONTEÚDO ---
-        self.content_frame = QFrame() 
+        self.content_frame = QFrame()
         self.content_frame.setObjectName("ContentFrame")
         content_v_layout = QVBoxLayout(self.content_frame)
         content_v_layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.pages = QStackedWidget()
-        
-        # --- PÁGINA HOME (Index 0) ---
+
         home_page = QWidget()
         home_layout = QVBoxLayout(home_page)
         self.welcome_label = QLabel("Bem-vindo ao AURA Security Toolkit!")
         self.welcome_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
         home_layout.addWidget(self.welcome_label)
-        
-        # Grid para 6 cards (2 linhas x 3 colunas)
+
         card_grid = QGridLayout()
         card_grid.setSpacing(15)
 
-        # Criando e configurando os cards
         self.card_scanner = NeonCard("🛰️", "Varredura", "Identifica hosts.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_scanner.on_card_activated = lambda: self.safe_change_page(2) 
+        self.card_scanner.on_card_activated = lambda: self.safe_change_page(self.PAGE_SCANNER)
 
         self.card_stress = NeonCard("🔥", "Stress Test", "Simulação DoS.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_stress.on_card_activated = lambda: self.safe_change_page(9)
+        self.card_stress.on_card_activated = lambda: self.safe_change_page(self.PAGE_STRESS)
 
         self.card_firewall = NeonCard("🛡️", "Firewall", "Verifica regras.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_firewall.on_card_activated = lambda: self.safe_change_page(6)
+        self.card_firewall.on_card_activated = lambda: self.safe_change_page(self.PAGE_FIREWALL)
 
         self.card_osint = NeonCard("🔍", "Sherlock", "OSINT Social.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_osint.on_card_activated = lambda: self.safe_change_page(10)
+        self.card_osint.on_card_activated = lambda: self.safe_change_page(self.PAGE_OSINT)
 
         self.card_john = NeonCard("💀", "John Ripper", "Quebra hashes.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_john.on_card_activated = lambda: self.safe_change_page(11)
+        self.card_john.on_card_activated = lambda: self.safe_change_page(self.PAGE_JOHN)
 
         self.card_keylogger = NeonCard("⌨️", "Key Auditor", "Log de teclado.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_keylogger.on_card_activated = lambda: self.safe_change_page(12)
+        self.card_keylogger.on_card_activated = lambda: self.safe_change_page(self.PAGE_KEYLOGGER)
 
         self.card_hydra = NeonCard("🧰", "Hydra", "Teste credenciais.", self.theme_manager.neon_color, self.theme_manager)
-        self.card_hydra.on_card_activated = lambda: self.safe_change_page(13)
+        self.card_hydra.on_card_activated = lambda: self.safe_change_page(self.PAGE_HYDRA)
 
-        # Adicionando ao Grid (Linha, Coluna)
         card_grid.addWidget(self.card_scanner, 0, 0)
         card_grid.addWidget(self.card_stress, 0, 1)
         card_grid.addWidget(self.card_firewall, 0, 2)
@@ -1627,99 +1656,83 @@ class MainWindow(QMainWindow):
 
         home_layout.addLayout(card_grid)
         home_layout.addStretch()
-        self.pages.addWidget(home_page) # Index 0
+        self.pages.addWidget(home_page)
 
-        # --- REGISTRO DAS PÁGINAS (Índices 1 a 12) ---
-        self.pages.addWidget(QLabel("Página Ferramentas (1)")) # Index 1
-        
+        self.pages.addWidget(self._build_placeholder_page("Página de ferramentas em consolidação."))
+
         self.scanner_page = ScannerPage(self)
-        self.pages.addWidget(self.scanner_page) # Index 2
-        
-        self.pages.addWidget(QLabel("Página Scripts (3)")) # Index 3
-        self.pages.addWidget(QLabel("Página Logs (4)")) # Index 4
-        
+        self.pages.addWidget(self.scanner_page)
+
+        self.pages.addWidget(self._build_placeholder_page("Página de scripts em consolidação."))
+        self.pages.addWidget(self._build_placeholder_page("Página de logs em consolidação."))
+
         self.config_page = ConfigPage(self)
-        self.pages.addWidget(self.config_page) # Index 5
+        self.pages.addWidget(self.config_page)
 
         self.firewall_page = FirewallPage(self)
-        self.pages.addWidget(self.firewall_page) # Index 6
+        self.pages.addWidget(self.firewall_page)
 
         self.payload_page = PayloadPage(self)
-        self.pages.addWidget(self.payload_page) # Index 7
+        self.pages.addWidget(self.payload_page)
 
         self.listener_page = ListenerPage(self)
-        self.pages.addWidget(self.listener_page) # Index 8
+        self.pages.addWidget(self.listener_page)
 
         self.stress_page = StressTestPage(self)
-        self.pages.addWidget(self.stress_page) # Index 9
+        self.pages.addWidget(self.stress_page)
 
         self.osint_page = SherlockPage(self)
-        self.pages.insertWidget(10, self.osint_page) # Index 10
+        self.pages.addWidget(self.osint_page)
 
-        self.john_page = JohnPage(self) 
-        self.pages.insertWidget(11, self.john_page) # Index 11
+        self.john_page = JohnPage(self)
+        self.pages.addWidget(self.john_page)
 
         self.key_auditor_page = KeyloggerPage(self)
-        self.pages.insertWidget(12, self.key_auditor_page) # Index 12
+        self.pages.addWidget(self.key_auditor_page)
 
         self.hydra_page = HydraPage(self)
-        self.pages.insertWidget(13, self.hydra_page) # Index 13
+        self.pages.addWidget(self.hydra_page)
 
-        # Finalização
         content_v_layout.addWidget(self.pages)
         main_layout.addWidget(self.content_frame)
 
-        # Conexões Sidebar
-        self.btn_home.clicked.connect(lambda: self.safe_change_page(0))
-        self.btn_tools.clicked.connect(lambda: self.safe_change_page(1))
-        self.btn_scanner.clicked.connect(lambda: self.safe_change_page(2))
-        self.btn_scripts.clicked.connect(lambda: self.safe_change_page(3))
-        self.btn_logs.clicked.connect(lambda: self.safe_change_page(4))
-        self.btn_config.clicked.connect(lambda: self.safe_change_page(5))
+        self.btn_home.clicked.connect(lambda: self.safe_change_page(self.PAGE_HOME))
+        self.btn_tools.clicked.connect(lambda: self.safe_change_page(self.PAGE_TOOLS))
+        self.btn_scanner.clicked.connect(lambda: self.safe_change_page(self.PAGE_SCANNER))
+        self.btn_scripts.clicked.connect(lambda: self.safe_change_page(self.PAGE_SCRIPTS))
+        self.btn_logs.clicked.connect(lambda: self.safe_change_page(self.PAGE_LOGS))
+        self.btn_config.clicked.connect(lambda: self.safe_change_page(self.PAGE_CONFIG))
 
     def _make_sidebar_button(self, text, icon):
         btn = QPushButton(f"  {icon} {text}")
         btn.setObjectName("SidebarButton")
         btn.setFixedHeight(45)
         btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        # O estilo CSS idealmente deve vir do theme_manager ou um arquivo .qss
         return btn
-
-    # ----------------- Gerenciamento de Tema -----------------
 
     def get_theme_colors(self, theme_key=None):
         return THEMES.get(theme_key or self.theme_manager.current_theme, THEMES['dark'])
 
     def _apply_theme(self, theme_key):
-        """Aplica o StyleSheet ao Main Window e atualiza os Cards."""
         T = self.get_theme_colors(theme_key)
-        neon_color = self.theme_manager.neon_color 
-        
+        neon_color = self.theme_manager.neon_color
+
         style = f"""
-        /* --- ESTILOS GERAIS --- */
         QMainWindow {{
-            background-color: {T['bg_main']}; /* Fundo principal */
+            background-color: {T['bg_main']};
         }}
-        
-        /* --- SIDEBAR --- */
         QFrame#Sidebar {{
             background-color: {T['bg_sidebar']};
         }}
-        
-        /* --- PÁGINAS DE CONTEÚDO --- */
-        QFrame#ContentFrame, QWidget#PageWidget {{ 
-            background-color: {T['bg_main']}; /* Fundo das páginas de conteúdo */
+        QFrame#ContentFrame, QWidget#PageWidget {{
+            background-color: {T['bg_main']};
         }}
-        
-        /* --- TEXTOS E LABELS --- */
         QLabel {{
             color: {T['text_main']};
         }}
-        QLabel#AuraTitle {{ 
-            color: {neon_color}; 
+        QLabel#AuraTitle {{
+            color: {neon_color};
         }}
-        
-        /* --- SIDEBAR BUTTONS --- */
         QPushButton#SidebarButton {{
             background-color: {T['bg_button']};
             color: {T['text_main']};
@@ -1731,38 +1744,30 @@ class MainWindow(QMainWindow):
             background-color: {T['bg_button_hover']};
             color: {T['text_main']};
         }}
-
-        /* --- INPUTS E GRUPOS (ConfigPage e ScannerPage) --- */
         QGroupBox {{
             color: {T['text_main']};
             border: 1px solid {T['border_card']};
             border-radius: 10px;
             padding-top: 20px;
             margin-top: 10px;
-            /* ⚠️ CORREÇÃO CRÍTICA: Força o fundo do QGroupBox a ser o fundo principal */
-            background-color: {T['bg_main']}; 
+            background-color: {T['bg_main']};
         }}
-        
         QLineEdit {{
-            background-color: {T['bg_input']}; 
+            background-color: {T['bg_input']};
             color: {T['text_main']};
             border: 1px solid {T['border_card']};
             border-radius: 5px;
             padding: 5px;
         }}
-        
         QScrollArea {{
-            /* ⚠️ CORREÇÃO: Força o fundo do QScrollArea e sua viewport */
-            background-color: {T['bg_main']}; 
+            background-color: {T['bg_main']};
             border: none;
         }}
-        QScrollArea QWidget {{ /* O widget interno do scroll area */
+        QScrollArea QWidget {{
             background-color: {T['bg_main']};
         }}
-
-        /* ⚠️ CORREÇÃO CRÍTICA: Componentes de controle na ConfigPage */
         QComboBox {{
-            background-color: {T['bg_input']}; 
+            background-color: {T['bg_input']};
             color: {T['text_main']};
             border: 1px solid {T['border_card']};
             border-radius: 5px;
@@ -1772,8 +1777,6 @@ class MainWindow(QMainWindow):
             color: {T['text_main']};
             background-color: {T['bg_main']};
         }}
-        
-        /* --- OUTROS BOTÕES (ScannerPage) --- */
         QPushButton {{
             background-color: {T['bg_button']};
             color: {T['text_main']};
@@ -1786,96 +1789,88 @@ class MainWindow(QMainWindow):
         }}
         """
         self.setStyleSheet(style)
-        
+
         for card in self.findChildren(NeonCard):
             card.set_neon_color(neon_color, self.theme_manager.current_theme)
-
-
-    # ----------------- Métodos de Configuração (Chamados pela ConfigPage) -----------------
 
     def apply_base_theme(self, theme_name):
         self.theme_manager.set_base_theme(theme_name)
         self._apply_theme(theme_name)
-        
+
     def set_global_neon_color(self, color):
         self.theme_manager.set_neon_color(color)
-        self._apply_theme(self.theme_manager.current_theme) 
+        self._apply_theme(self.theme_manager.current_theme)
 
     def apply_language(self, lang_name):
-        # ... (seu código de mapeamento atual) ... 
-        
-        new_L = load_language_json(lang_code, self.base_dir) 
-        self.L = new_L
-        self.current_lang_code = lang_code
-        
-        self.update_ui_language(lang_code) [cite: 98]
-        
-        # ADICIONE ESTA LINHA: Força o redesenho nítido após a troca de texto
-        QTimer.singleShot(50, self._refresh_neon_fix)
-        
         lang_map = {
-            "Português": "pt", "Inglês": "en", "Espanhol": "es", 
-            "Francês": "fr", "Alemão": "de", "Italiano": "it",
-            "Russo": "ru", "Chinês": "zh", "Coreano": "ko", 
-            "Japonês": "ja", "Árabe": "ar"
+            "Português": "pt",
+            "Inglês": "en",
+            "Espanhol": "es",
+            "Francês": "fr",
+            "Alemão": "de",
+            "Italiano": "it",
+            "Russo": "ru",
+            "Chinês": "zh",
+            "Coreano": "ko",
+            "Japonês": "ja",
+            "Árabe": "ar",
         }
-        
+
         lang_code = lang_map.get(lang_name, "pt")
-        
-        new_L = load_language_json(lang_code, self.base_dir) 
-        self.L = new_L
+        self.L = load_language_json(lang_code, self.base_dir)
         self.current_lang_code = lang_code
-        
         self.update_ui_language(lang_code)
-        
-    # ----------------- Atualização de Idioma -----------------
+
+        QTimer.singleShot(50, self._refresh_neon_fix)
 
     def update_ui_language(self, lang_code):
-        """Atualiza todos os textos da UI com base no dicionário de idioma carregado (self.L)."""
-        L = self.L 
-        
-        self.btn_home.setText("  " + lang_get(L, "sidebar.home", "🏠 Home"))
-        self.btn_tools.setText("  " + lang_get(L, "sidebar.tools", "🛠️ Ferramentas"))
-        self.btn_scanner.setText("  " + lang_get(L, "sidebar.scanner", "🛰️ Scanner")) 
-        self.btn_scripts.setText("  " + lang_get(L, "sidebar.scripts", "📜 Scripts"))
-        self.btn_logs.setText("  " + lang_get(L, "sidebar.logs", "📁 Logs"))
-        self.btn_config.setText("  " + lang_get(L, "sidebar.settings", "⚙️ Configurações"))
+        L = self.L
+
+        self.btn_home.setText("  🏠 " + lang_get(L, "sidebar.home", "Home"))
+        self.btn_tools.setText("  🛠️ " + lang_get(L, "sidebar.tools", "Ferramentas"))
+        self.btn_scanner.setText("  🛰️ " + lang_get(L, "sidebar.scanner", "Scanner"))
+        self.btn_scripts.setText("  📜 " + lang_get(L, "sidebar.scripts", "Scripts"))
+        self.btn_logs.setText("  📁 " + lang_get(L, "sidebar.logs", "Logs"))
+        self.btn_config.setText("  ⚙️ " + lang_get(L, "sidebar.settings", "Configurações"))
         self.status_label.setText(lang_get(L, "header.status_ready", "Status: Pronto"))
-        
-        self.firewall_page.update_ui_language(L)
-        self.config_page.update_ui_language(L) 
+
+        self.config_page.update_ui_language(L)
         self.scanner_page.update_ui_language(L)
-        
-        self.welcome_label.setText(lang_get(L, "home_page.welcome", "Bem-vindo ao AURA Security Toolkit!")) 
-        
+        if hasattr(self.firewall_page, "update_ui_language"):
+            self.firewall_page.update_ui_language(L)
+        if hasattr(self.payload_page, "update_ui_language"):
+            self.payload_page.update_ui_language(L)
+
+        self.welcome_label.setText(
+            lang_get(L, "home_page.welcome", "Bem-vindo ao AURA Security Toolkit!")
+        )
+
         self.card_scanner.set_texts(
             lang_get(L, "cards.scanner.title", "Varredura de Rede"),
-            lang_get(L, "cards.scanner.subtitle", "Varre e detecta hosts")
+            lang_get(L, "cards.scanner.subtitle", "Varre e detecta hosts"),
         )
-        self.card_stress(
-            lang_get(L, "cards.stress.title", "Teste de Stress (DDoS)"), 
-            lang_get(L, "cards.stress.subtitle", "Testar resiliência do alvo")
-        )
+        self.card_stress.set_texts("Stress Test", "Simulação DoS.")
         self.card_firewall.set_texts(
-            lang_get(L, "cards.ports.title", "Analisador de Portas (Ex. Firewall)"),
-            lang_get(L, "cards.ports.subtitle", "Testa portas específicas")
+            lang_get(L, "cards.ports.title", "Analisador de Portas"),
+            lang_get(L, "cards.ports.subtitle", "Testa portas específicas"),
         )
-        
-        self.current_lang_code = lang_code 
+        self.card_osint.set_texts("Sherlock", "OSINT Social.")
+        self.card_john.set_texts("John Ripper", "Quebra hashes.")
+        self.card_keylogger.set_texts("Key Auditor", "Log de teclado.")
+        self.card_hydra.set_texts("Hydra", "Teste credenciais.")
 
+        self.current_lang_code = lang_code
 
-    # ----------------- closeEvent (Persistência) -----------------
-    
     def closeEvent(self, event):
         if hasattr(self, 'stress_page') and self.stress_page.executor:
             self.stress_page.executor.stop()
-        
+
         self.user_settings['language'] = self.current_lang_code
         self.user_settings['theme'] = self.theme_manager.current_theme
         self.user_settings['neon_color'] = self.theme_manager.neon_color
-        
+
         save_user_settings(self.base_dir, self.user_settings)
-        
+
         super().closeEvent(event)
 
 # --- EXECUÇÃO PRINCIPAL ---

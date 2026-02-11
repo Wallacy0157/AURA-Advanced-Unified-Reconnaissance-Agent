@@ -7,7 +7,8 @@
         "scripts": "السكريبتات",
         "logs": "السجلات",
         "settings": "الإعدادات",
-        "exit": "خروج"
+        "exit": "خروج",
+        "scanner": "الماسح"
     },
 
     "header": {
@@ -91,5 +92,16 @@
         "lang_ko": "الكورية",
         "lang_zh": "الصينية",
         "lang_ar": "العربية"
+    },
+    "home_page": {
+        "welcome": "مرحبًا بك في AURA Security Toolkit!"
+    },
+    "scanner_page": {
+        "targets_group": "أهداف الفحص (IP/نطاقات)",
+        "ip_placeholder": "مثال: 192.168.1.1, 10.0.0.0/24, إلخ",
+        "start_scan": "بدء فحص Nmap",
+        "results_group": "النتائج",
+        "awaiting_scan": "بانتظار الفحص...",
+        "save_results": "حفظ النتائج في السجلات/التقارير"
     }
 }

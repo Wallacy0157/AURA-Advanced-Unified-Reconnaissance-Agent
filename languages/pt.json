@@ -101,5 +101,8 @@
         "lang_ko": "Coreano",
         "lang_zh": "Chinês",
         "lang_ar": "Árabe"
+    },
+    "home_page": {
+        "welcome": "Bem-vindo ao AURA Security Toolkit!"
     }
 }

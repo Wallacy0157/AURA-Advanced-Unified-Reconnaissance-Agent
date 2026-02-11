@@ -7,7 +7,8 @@
         "scripts": "Скрипты",
         "logs": "Журналы",
         "settings": "Настройки",
-        "exit": "Выход"
+        "exit": "Выход",
+        "scanner": "Сканер"
     },
 
     "header": {
@@ -91,5 +92,16 @@
         "lang_ko": "Корейский",
         "lang_zh": "Китайский",
         "lang_ar": "Арабский"
+    },
+    "home_page": {
+        "welcome": "Добро пожаловать в AURA Security Toolkit!"
+    },
+    "scanner_page": {
+        "targets_group": "Цели сканирования (IP/диапазоны)",
+        "ip_placeholder": "Пример: 192.168.1.1, 10.0.0.0/24 и т.д.",
+        "start_scan": "Запустить сканирование Nmap",
+        "results_group": "Результаты",
+        "awaiting_scan": "Ожидание сканирования...",
+        "save_results": "Сохранить результаты в логи/отчёты"
     }
 }

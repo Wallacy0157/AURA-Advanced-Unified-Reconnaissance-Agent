@@ -7,7 +7,8 @@
         "scripts": "スクリプト",
         "logs": "ログ",
         "settings": "設定",
-        "exit": "終了"
+        "exit": "終了",
+        "scanner": "スキャナー"
     },
 
     "header": {
@@ -91,5 +92,16 @@
         "lang_ko": "韓国語",
         "lang_zh": "中国語",
         "lang_ar": "アラビア語"
+    },
+    "home_page": {
+        "welcome": "AURA Security Toolkit へようこそ！"
+    },
+    "scanner_page": {
+        "targets_group": "スキャン対象（IP/範囲）",
+        "ip_placeholder": "例: 192.168.1.1, 10.0.0.0/24 など",
+        "start_scan": "Nmapスキャンを開始",
+        "results_group": "結果",
+        "awaiting_scan": "スキャン待機中...",
+        "save_results": "結果をログ/レポートに保存"
     }
 }

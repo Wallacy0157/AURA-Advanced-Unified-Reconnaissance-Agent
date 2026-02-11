@@ -7,7 +7,8 @@
         "scripts": "脚本",
         "logs": "日志",
         "settings": "设置",
-        "exit": "退出"
+        "exit": "退出",
+        "scanner": "扫描器"
     },
 
     "header": {
@@ -91,5 +92,16 @@
         "lang_ko": "韩语",
         "lang_zh": "中文",
         "lang_ar": "阿拉伯语"
+    },
+    "home_page": {
+        "welcome": "欢迎使用 AURA Security Toolkit！"
+    },
+    "scanner_page": {
+        "targets_group": "扫描目标（IP/网段）",
+        "ip_placeholder": "例如：192.168.1.1, 10.0.0.0/24 等",
+        "start_scan": "开始 Nmap 扫描",
+        "results_group": "结果",
+        "awaiting_scan": "等待扫描...",
+        "save_results": "将结果保存到日志/报告"
     }
 }
