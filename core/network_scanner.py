@@ -110,7 +110,13 @@ def scan_single_target(ip: str):
 
 def parse_hosts(data):
     results = []
-    hosts = data.get("nmaprun", {}).get("host", [])
+
+    nmaprun = data.get("nmaprun", {})
+
+    if "host" not in nmaprun:
+        return []
+
+    hosts = nmaprun["host"]
 
     if isinstance(hosts, dict):
         hosts = [hosts]
@@ -199,9 +205,12 @@ def detect_web_urls(ip, open_ports):
     urls = []
 
     for p in open_ports:
-        if p["service"] == "http":
+        service = p["service"].lower()
+
+        if service == "http":
             urls.append(f"http://{ip}:{p['port']}")
-        elif p["service"] == "https":
+
+        elif service in ["https", "ssl/http"]:
             urls.append(f"https://{ip}:{p['port']}")
 
     return urls
@@ -222,7 +231,7 @@ def run_nikto(url):
 
         return {
             "status": "executed",
-            "output": result.stdout[:8000]  # evita relatório gigante
+            "output": result.stdout[:8000]
         }
 
     except subprocess.TimeoutExpired:
@@ -298,10 +307,10 @@ def parse_vulners_output(vulners_data: dict, port: int):
 
 
 def build_nmap_command(ip):
-    cmd = ["nmap", "-sV", "--script", "vuln", "-oX", "-"]
+    cmd = ["nmap", "-sV", "--script", "vuln,http-enum,http-headers,http-methods", "-oX", "-"]
 
     if os.geteuid() == 0:
-        cmd.insert(1, "-O")  # OS scan só se root
+        cmd.insert(1, "-O")
     else:
         print("[!] Rodando sem OS detection (sem privilégios)")
 

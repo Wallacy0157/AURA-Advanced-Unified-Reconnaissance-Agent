@@ -4,6 +4,7 @@ import os
 import sys
 import json
 import re
+import shutil
 import subprocess
 import platform
 import socket
@@ -41,6 +42,125 @@ from core.config import (
 from core.john_engine import JohnEngine
 from core.hydra_engine import HydraWorker
 from core.logger_engine import KeyloggerEngine
+
+# --- DIAGNOSTICO ---
+class EnvironmentDiagnosticsPage(QWidget):
+    TOOL_CHECKS = [
+        ("Nmap", "nmap"),
+        ("Nikto", "nikto"),
+        ("SQLMap", "sqlmap"),
+    ]
+
+    def __init__(self, parent_window):
+        super().__init__()
+        self.parent_window = parent_window
+        self.last_results = {}
+        self._setup_ui()
+
+    def _setup_ui(self):
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        self.title_label = QLabel("Diagnóstico do Ambiente")
+        self.title_label.setFont(QFont("Arial", 16, QFont.Weight.Bold))
+        layout.addWidget(self.title_label)
+
+        self.description_label = QLabel(
+            "Verifica se as ferramentas principais já estão instaladas no sistema."
+        )
+        self.description_label.setWordWrap(True)
+        layout.addWidget(self.description_label)
+
+        self.run_button = QPushButton("Executar diagnóstico")
+        self.run_button.clicked.connect(self.run_diagnostics)
+        layout.addWidget(self.run_button)
+
+        self.result_box = QTextEdit()
+        self.result_box.setReadOnly(True)
+        self.result_box.setMinimumHeight(220)
+        self.result_box.setText("Clique em 'Executar diagnóstico' para verificar o ambiente.")
+        layout.addWidget(self.result_box)
+
+        self.install_button = QPushButton("Instalar dependências faltantes (Linux/apt)")
+        self.install_button.setEnabled(False)
+        self.install_button.clicked.connect(self.install_missing_tools)
+        layout.addWidget(self.install_button)
+
+        layout.addStretch()
+
+    def update_ui_language(self, L):
+        self.title_label.setText(lang_get(L, "diagnostics_page.title", "Diagnóstico do Ambiente"))
+        self.description_label.setText(
+            lang_get(
+                L,
+                "diagnostics_page.description",
+                "Verifica se as ferramentas principais já estão instaladas no sistema.",
+            )
+        )
+        self.run_button.setText(lang_get(L, "diagnostics_page.run", "Executar diagnóstico"))
+        self.install_button.setText(
+            lang_get(
+                L,
+                "diagnostics_page.install_missing",
+                "Instalar dependências faltantes (Linux/apt)",
+            )
+        )
+
+    def run_diagnostics(self):
+        lines = ["--- Diagnóstico de ferramentas ---"]
+        missing_tools = []
+        self.last_results = {}
+
+        for tool_name, cmd in self.TOOL_CHECKS:
+            detected = shutil.which(cmd) is not None
+            self.last_results[tool_name] = detected
+
+            if detected:
+                lines.append(f"✔ {tool_name} detectado")
+            else:
+                lines.append(f"❌ {tool_name} não encontrado")
+                missing_tools.append(cmd)
+
+        if missing_tools:
+            lines.append("\nVocê pode instalar os itens faltantes automaticamente no Linux (apt).")
+        else:
+            lines.append("\nAmbiente pronto: tudo detectado.")
+
+        self.result_box.setText("\n".join(lines))
+        self.install_button.setEnabled(bool(missing_tools))
+
+    def install_missing_tools(self):
+        missing = [cmd for name, cmd in self.TOOL_CHECKS if not self.last_results.get(name, False)]
+        if not missing:
+            QMessageBox.information(self, "Diagnóstico", "Nenhuma ferramenta faltando para instalar.")
+            return
+
+        if platform.system().lower() != "linux":
+            QMessageBox.warning(
+                self,
+                "Instalação indisponível",
+                "A instalação automática só está disponível para Linux com apt.",
+            )
+            return
+
+        cmd = ["pkexec", "apt-get", "install", "-y", *missing]
+        self.result_box.append("\nExecutando: " + " ".join(cmd))
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            if proc.stdout.strip():
+                self.result_box.append("\n--- Saída ---\n" + proc.stdout.strip())
+
+            if proc.returncode == 0:
+                self.result_box.append("\n✔ Instalação concluída. Rode o diagnóstico novamente.")
+            else:
+                err = proc.stderr.strip() or "Falha desconhecida"
+                self.result_box.append("\n❌ Falha na instalação automática: " + err)
+        except FileNotFoundError:
+            self.result_box.append(
+                "\n❌ 'pkexec' não encontrado. Use manualmente: sudo apt-get install -y " + " ".join(missing)
+            )
+
+
 
 # --- 1. CLASSE WORKER (Para não congelar a UI durante o Nmap) ---
 class ScannerWorker(QThread):
@@ -1584,7 +1704,7 @@ class MainWindow(QMainWindow):
         sidebar_layout.addWidget(self.title_label)
 
         self.btn_home = self._make_sidebar_button("Home", "🏠")
-        self.btn_tools = self._make_sidebar_button("Ferramentas", "🛠️")
+        self.btn_tools = self._make_sidebar_button("Diagnóstico do Ambiente", "🧪")
         self.btn_scanner = self._make_sidebar_button("Scanner", "🛰️")
         self.btn_scripts = self._make_sidebar_button("Scripts", "📜")
         self.btn_logs = self._make_sidebar_button("Logs", "📁")
@@ -1658,7 +1778,8 @@ class MainWindow(QMainWindow):
         home_layout.addStretch()
         self.pages.addWidget(home_page)
 
-        self.pages.addWidget(self._build_placeholder_page("Página de ferramentas em consolidação."))
+        self.diagnostics_page = EnvironmentDiagnosticsPage(self)
+        self.pages.addWidget(self.diagnostics_page)
 
         self.scanner_page = ScannerPage(self)
         self.pages.addWidget(self.scanner_page)
@@ -1827,7 +1948,7 @@ class MainWindow(QMainWindow):
         L = self.L
 
         self.btn_home.setText("  🏠 " + lang_get(L, "sidebar.home", "Home"))
-        self.btn_tools.setText("  🛠️ " + lang_get(L, "sidebar.tools", "Ferramentas"))
+        self.btn_tools.setText("  🧪 " + lang_get(L, "sidebar.tools", "Diagnóstico do Ambiente"))
         self.btn_scanner.setText("  🛰️ " + lang_get(L, "sidebar.scanner", "Scanner"))
         self.btn_scripts.setText("  📜 " + lang_get(L, "sidebar.scripts", "Scripts"))
         self.btn_logs.setText("  📁 " + lang_get(L, "sidebar.logs", "Logs"))
@@ -1836,6 +1957,8 @@ class MainWindow(QMainWindow):
 
         self.config_page.update_ui_language(L)
         self.scanner_page.update_ui_language(L)
+        self.diagnostics_page.update_ui_language(L)
+
         if hasattr(self.firewall_page, "update_ui_language"):
             self.firewall_page.update_ui_language(L)
         if hasattr(self.payload_page, "update_ui_language"):
